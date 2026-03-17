@@ -1,5 +1,44 @@
+# Dependencies
 node_modules/
+
+# Build output
 dist/
+
+# TypeScript incremental build info
+*.tsbuildinfo
+
+# Source maps
 *.js.map
+
+# Vite cache
+.vite/
+
+# Test coverage
+coverage/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Environment variables (may contain secrets)
+.env
+.env.*
+!.env.example
+
+# macOS metadata
 .DS_Store
+
+# Git worktrees (local dev only)
 .worktrees/
+
+# AI coding tool configs (personal, local)
+.claude/
+.superpowers/
+.gemini/
+.codex/
+.antigravity/
+.cursor/
+.aider*
+.continue/

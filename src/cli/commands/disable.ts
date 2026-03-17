@@ -9,7 +9,12 @@ export function disableCommand(): Command {
     .requiredOption('--agent <agent>', 'Agent ID (e.g. claude-code)')
     .description('Disable a skill for a project+agent')
     .action(async (name: string, opts: { project: string; agent: string }) => {
-      await createStateManager(STATE_PATH).disable(opts.project, opts.agent, name, AGENT_DIRS)
-      console.log(`✓ Disabled ${name} for ${opts.agent} in ${opts.project}`)
+      try {
+        await createStateManager(STATE_PATH).disable(opts.project, opts.agent, name, AGENT_DIRS)
+        console.log(`✓ Disabled ${name} for ${opts.agent} in ${opts.project}`)
+      } catch (err: unknown) {
+        console.error(`Error: ${err instanceof Error ? err.message : String(err)}`)
+        process.exit(1)
+      }
     })
 }

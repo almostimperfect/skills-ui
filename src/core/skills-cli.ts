@@ -1,8 +1,15 @@
 import { execFile } from 'child_process'
+import { fileURLToPath } from 'url'
+import { join, dirname } from 'path'
 import type { Skill } from './types.js'
 
 const DEFAULT_TIMEOUT = 30_000
 const ADD_TIMEOUT = 120_000
+
+// Resolve path to the bundled `skills` binary from node_modules to avoid
+// picking up a different version that may be on PATH via `npx`.
+const __dirname = dirname(fileURLToPath(import.meta.url))
+const SKILLS_BIN = join(__dirname, '..', '..', 'node_modules', '.bin', 'skills')
 
 export class SkillsCliError extends Error {
   constructor(
@@ -17,12 +24,12 @@ export class SkillsCliError extends Error {
 
 async function runSkills(args: string[], timeout = DEFAULT_TIMEOUT): Promise<string> {
   return new Promise((resolve, reject) => {
-    execFile('npx', ['skills', ...args], { timeout, env: { ...process.env } }, (err, stdout, stderr) => {
+    execFile(SKILLS_BIN, args, { timeout, env: { ...process.env } }, (err, stdout, stderr) => {
       if (err) {
         const e = err as NodeJS.ErrnoException & { code?: number; stderr?: string }
         if (e.code === 'ENOENT' || String(e.message).includes('not found')) {
           return reject(new SkillsCliError(
-            'skills CLI not found. Try reinstalling: npm install -g skills-ui',
+            'skills CLI not found. Try running: npm install',
             undefined,
             typeof stderr === 'string' ? stderr : e.stderr
           ))

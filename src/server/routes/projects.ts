@@ -1,4 +1,6 @@
 import { Router } from 'express'
+import { isAbsolute } from 'path'
+import { access } from 'fs/promises'
 import { createProjectRegistry } from '../../core/projects.js'
 import { createStateManager } from '../../core/state.js'
 import { listSkills } from '../../core/skills-cli.js'
@@ -22,6 +24,16 @@ export function projectsRouter(): Router {
     const { path: projectPath, agents } = req.body as { path?: string; agents?: string[] }
     if (!projectPath) {
       res.status(400).json({ error: 'path is required' })
+      return
+    }
+    if (!isAbsolute(projectPath)) {
+      res.status(400).json({ error: 'path must be an absolute path' })
+      return
+    }
+    try {
+      await access(projectPath)
+    } catch {
+      res.status(400).json({ error: 'path does not exist or is not accessible' })
       return
     }
     try {

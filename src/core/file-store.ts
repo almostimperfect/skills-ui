@@ -18,7 +18,12 @@ export async function readJson<T>(filePath: string, defaultValue: T): Promise<T>
 export async function writeJson<T>(filePath: string, data: T): Promise<void> {
   const prev = writeQueues.get(filePath) ?? Promise.resolve()
   const next = prev.then(() => atomicWrite(filePath, data))
-  writeQueues.set(filePath, next.catch(() => {}))
+  // Suppress errors in the queued chain so a failed write doesn't stall future writes.
+  // Clean up the map entry once this write settles so the chain doesn't grow indefinitely.
+  const queued = next.catch(() => {}).finally(() => {
+    if (writeQueues.get(filePath) === queued) writeQueues.delete(filePath)
+  })
+  writeQueues.set(filePath, queued)
   await next
 }
 

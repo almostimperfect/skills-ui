@@ -32,6 +32,13 @@ vi.mock('../../src/core/skills-cli.js', () => ({
 vi.mock('../../src/core/metadata.js', () => ({
   parseSkillMetadata: vi.fn(),
 }))
+vi.mock('fs/promises', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('fs/promises')>()
+  return {
+    ...actual,
+    access: vi.fn().mockResolvedValue(undefined),
+  }
+})
 
 import { createApp } from '../../src/server/index.js'
 
@@ -64,6 +71,12 @@ describe('POST /api/projects', () => {
   it('returns 400 when path is missing', async () => {
     const app = createApp()
     const res = await request(app).post('/api/projects').send({})
+    expect(res.status).toBe(400)
+  })
+
+  it('returns 400 when path is relative', async () => {
+    const app = createApp()
+    const res = await request(app).post('/api/projects').send({ path: 'relative/path' })
     expect(res.status).toBe(400)
   })
 })

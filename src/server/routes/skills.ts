@@ -3,7 +3,7 @@ import { listSkills, addSkill, removeSkill, SkillsCliError } from '../../core/sk
 import { parseSkillMetadata } from '../../core/metadata.js'
 import { createStateManager } from '../../core/state.js'
 import { createProjectRegistry } from '../../core/projects.js'
-import { CONFIG_PATH, STATE_PATH, AGENT_DIRS, CANONICAL_SKILLS_DIR } from '../../core/constants.js'
+import { CONFIG_PATH, STATE_PATH, AGENT_DIRS, CANONICAL_SKILLS_DIR, SUPPORTED_AGENTS } from '../../core/constants.js'
 import { join } from 'path'
 import { homedir } from 'os'
 
@@ -92,6 +92,10 @@ export function skillsRouter(): Router {
       res.status(400).json({ error: 'projectPath and agent are required' })
       return
     }
+    if (!(SUPPORTED_AGENTS as string[]).includes(agent)) {
+      res.status(400).json({ error: `agent must be one of: ${SUPPORTED_AGENTS.join(', ')}` })
+      return
+    }
     try {
       await state.enable(projectPath, agent, req.params.name, AGENT_DIRS)
       res.json({ ok: true })
@@ -104,6 +108,10 @@ export function skillsRouter(): Router {
     const { projectPath, agent } = req.body as { projectPath?: string; agent?: string }
     if (!projectPath || !agent) {
       res.status(400).json({ error: 'projectPath and agent are required' })
+      return
+    }
+    if (!(SUPPORTED_AGENTS as string[]).includes(agent)) {
+      res.status(400).json({ error: `agent must be one of: ${SUPPORTED_AGENTS.join(', ')}` })
       return
     }
     try {

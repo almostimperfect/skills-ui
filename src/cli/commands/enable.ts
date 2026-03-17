@@ -9,7 +9,12 @@ export function enableCommand(): Command {
     .requiredOption('--agent <agent>', 'Agent ID (e.g. claude-code)')
     .description('Enable a skill for a project+agent')
     .action(async (name: string, opts: { project: string; agent: string }) => {
-      await createStateManager(STATE_PATH).enable(opts.project, opts.agent, name, AGENT_DIRS)
-      console.log(`✓ Enabled ${name} for ${opts.agent} in ${opts.project}`)
+      try {
+        await createStateManager(STATE_PATH).enable(opts.project, opts.agent, name, AGENT_DIRS)
+        console.log(`✓ Enabled ${name} for ${opts.agent} in ${opts.project}`)
+      } catch (err: unknown) {
+        console.error(`Error: ${err instanceof Error ? err.message : String(err)}`)
+        process.exit(1)
+      }
     })
 }

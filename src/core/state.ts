@@ -34,7 +34,15 @@ export function createStateManager(statePath: string, canonicalBaseDir?: string)
     },
 
     async disable(projectPath, agent, skillName, agentDirs) {
-      // Remove symlink from agent directory
+      // Write state first so it's consistent even if the symlink removal fails
+      const state = await read()
+      state.disabled[projectPath] ??= {}
+      state.disabled[projectPath][agent] ??= []
+      if (!state.disabled[projectPath][agent].includes(skillName)) {
+        state.disabled[projectPath][agent].push(skillName)
+      }
+      await write(state)
+      // Then remove symlink from agent directory
       const agentRelDir = agentDirs[agent]
       if (agentRelDir) {
         const symlinkPath = join(projectPath, agentRelDir, skillName)
@@ -44,31 +52,10 @@ export function createStateManager(statePath: string, canonicalBaseDir?: string)
           if ((e as NodeJS.ErrnoException).code !== 'ENOENT') throw e
         }
       }
-      // Record in state
-      const state = await read()
-      state.disabled[projectPath] ??= {}
-      state.disabled[projectPath][agent] ??= []
-      if (!state.disabled[projectPath][agent].includes(skillName)) {
-        state.disabled[projectPath][agent].push(skillName)
-      }
-      await write(state)
     },
 
     async enable(projectPath, agent, skillName, agentDirs) {
-      // Recreate symlink
-      const agentRelDir = agentDirs[agent]
-      if (agentRelDir) {
-        const agentSkillsDir = join(projectPath, agentRelDir)
-        await mkdir(agentSkillsDir, { recursive: true })
-        const symlinkPath = join(agentSkillsDir, skillName)
-        const target = join(baseDir, CANONICAL_SKILLS_DIR, skillName)
-        try {
-          await symlink(target, symlinkPath)
-        } catch (e: unknown) {
-          if ((e as NodeJS.ErrnoException).code !== 'EEXIST') throw e
-        }
-      }
-      // Remove from disabled list
+      // Write state first so it's consistent even if the symlink creation fails
       const state = await read()
       if (state.disabled[projectPath]?.[agent]) {
         state.disabled[projectPath][agent] = state.disabled[projectPath][agent].filter(
@@ -82,6 +69,19 @@ export function createStateManager(statePath: string, canonicalBaseDir?: string)
         }
       }
       await write(state)
+      // Then recreate symlink
+      const agentRelDir = agentDirs[agent]
+      if (agentRelDir) {
+        const agentSkillsDir = join(projectPath, agentRelDir)
+        await mkdir(agentSkillsDir, { recursive: true })
+        const symlinkPath = join(agentSkillsDir, skillName)
+        const target = join(baseDir, CANONICAL_SKILLS_DIR, skillName)
+        try {
+          await symlink(target, symlinkPath)
+        } catch (e: unknown) {
+          if ((e as NodeJS.ErrnoException).code !== 'EEXIST') throw e
+        }
+      }
     },
 
     async cleanupSkill(skillName) {

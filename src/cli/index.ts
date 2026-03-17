@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { Command } from 'commander'
+import { createRequire } from 'module'
 import { addCommand } from './commands/add.js'
 import { removeCommand } from './commands/remove.js'
 import { listCommand } from './commands/list.js'
@@ -9,10 +10,13 @@ import { projectsCommand } from './commands/projects.js'
 import { projectAddCommand } from './commands/project-add.js'
 import { serveCommand } from './commands/serve.js'
 
+const require = createRequire(import.meta.url)
+const { version } = require('../../package.json') as { version: string }
+
 const program = new Command()
   .name('skills-ui')
   .description('Visual management layer for agent skills')
-  .version('0.1.0')
+  .version(version)
 
 program.addCommand(addCommand())
 program.addCommand(removeCommand())

@@ -19,6 +19,12 @@ export function createApp() {
   // Serve static web UI (only in production)
   const webDistPath = join(__dirname, '..', 'web')
   app.use(express.static(webDistPath))
+
+  // Return a JSON 404 for unknown /api/* routes instead of falling through to the SPA
+  app.use('/api', (_req, res) => {
+    res.status(404).json({ error: 'Not found' })
+  })
+
   app.get('*', (_req, res) => {
     res.sendFile(join(webDistPath, 'index.html'))
   })

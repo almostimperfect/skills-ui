@@ -23,6 +23,9 @@ export default function SkillDetail() {
       </Link>
       <h1 className="text-2xl font-bold text-gray-900 mb-2">{skill.name}</h1>
       {skill.description && <p className="text-gray-500 mb-6">{skill.description}</p>}
+      {skill.source && (
+        <p className="text-xs text-gray-400 mb-6">Source: {skill.source}</p>
+      )}
 
       {projectPaths.length === 0 ? (
         <p className="text-gray-400 text-sm">No projects registered. Add a project to manage this skill.</p>

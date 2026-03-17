@@ -32,7 +32,7 @@ afterEach(async () => {
 
 describe('disable', () => {
   it('removes the symlink from agent dir', async () => {
-    const mgr = createStateManager(statePath)
+    const mgr = createStateManager(statePath, projectDir)
     const symlinkPath = join(projectDir, '.claude', 'skills', 'tdd-workflow')
     expect(existsSync(symlinkPath)).toBe(true)
     await mgr.disable(projectDir, 'claude-code', 'tdd-workflow', {
@@ -42,7 +42,7 @@ describe('disable', () => {
   })
 
   it('records disabled state in state.json', async () => {
-    const mgr = createStateManager(statePath)
+    const mgr = createStateManager(statePath, projectDir)
     await mgr.disable(projectDir, 'claude-code', 'tdd-workflow', {
       'claude-code': '.claude/skills',
     })
@@ -53,7 +53,7 @@ describe('disable', () => {
 
 describe('enable', () => {
   it('recreates the symlink from agent dir to canonical', async () => {
-    const mgr = createStateManager(statePath)
+    const mgr = createStateManager(statePath, projectDir)
     const agentDirs = { 'claude-code': '.claude/skills' }
     // First disable
     await mgr.disable(projectDir, 'claude-code', 'tdd-workflow', agentDirs)
@@ -65,7 +65,7 @@ describe('enable', () => {
   })
 
   it('removes disabled entry from state.json', async () => {
-    const mgr = createStateManager(statePath)
+    const mgr = createStateManager(statePath, projectDir)
     const agentDirs = { 'claude-code': '.claude/skills' }
     await mgr.disable(projectDir, 'claude-code', 'tdd-workflow', agentDirs)
     await mgr.enable(projectDir, 'claude-code', 'tdd-workflow', agentDirs)
@@ -76,7 +76,7 @@ describe('enable', () => {
 
 describe('cleanupSkill', () => {
   it('removes all disabled entries for a given skill name', async () => {
-    const mgr = createStateManager(statePath)
+    const mgr = createStateManager(statePath, projectDir)
     const agentDirs = { 'claude-code': '.claude/skills' }
     await mgr.disable(projectDir, 'claude-code', 'tdd-workflow', agentDirs)
     await mgr.cleanupSkill('tdd-workflow')
@@ -87,7 +87,7 @@ describe('cleanupSkill', () => {
 
 describe('cleanupProject', () => {
   it('removes all disabled entries for a given project', async () => {
-    const mgr = createStateManager(statePath)
+    const mgr = createStateManager(statePath, projectDir)
     const agentDirs = { 'claude-code': '.claude/skills' }
     await mgr.disable(projectDir, 'claude-code', 'tdd-workflow', agentDirs)
     await mgr.cleanupProject(projectDir)

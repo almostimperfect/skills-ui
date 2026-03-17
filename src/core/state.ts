@@ -1,5 +1,6 @@
 import { symlink, unlink, mkdir } from 'fs/promises'
 import { join } from 'path'
+import { homedir } from 'os'
 import { readJson, writeJson } from './file-store.js'
 import type { DisabledState } from './types.js'
 import { CANONICAL_SKILLS_DIR } from './constants.js'
@@ -15,7 +16,9 @@ export interface StateManager {
   getDisabled(projectPath: string): Promise<Record<string, string[]>>
 }
 
-export function createStateManager(statePath: string): StateManager {
+export function createStateManager(statePath: string, canonicalBaseDir?: string): StateManager {
+  const baseDir = canonicalBaseDir ?? homedir()
+
   async function read(): Promise<DisabledState> {
     return readJson<DisabledState>(statePath, { disabled: {} })
   }
@@ -58,7 +61,7 @@ export function createStateManager(statePath: string): StateManager {
         const agentSkillsDir = join(projectPath, agentRelDir)
         await mkdir(agentSkillsDir, { recursive: true })
         const symlinkPath = join(agentSkillsDir, skillName)
-        const target = join(projectPath, CANONICAL_SKILLS_DIR, skillName)
+        const target = join(baseDir, CANONICAL_SKILLS_DIR, skillName)
         try {
           await symlink(target, symlinkPath)
         } catch (e: unknown) {

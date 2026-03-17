@@ -22,7 +22,7 @@ async function runSkills(args: string[], timeout = DEFAULT_TIMEOUT): Promise<str
         const e = err as NodeJS.ErrnoException & { code?: number; stderr?: string }
         if (e.code === 'ENOENT' || String(e.message).includes('not found')) {
           return reject(new SkillsCliError(
-            'skills CLI not found. Install it with: npm install -g skills',
+            'skills CLI not found. Try reinstalling: npm install -g skills-ui',
             undefined,
             typeof stderr === 'string' ? stderr : e.stderr
           ))

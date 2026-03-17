@@ -7,7 +7,6 @@ Adds a Web UI and per-project enable/disable toggle on top of the `skills` CLI.
 ## Requirements
 
 - Node.js 18+
-- `skills` CLI: `npm install -g skills`
 
 ## Install
 

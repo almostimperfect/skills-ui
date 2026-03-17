@@ -8,8 +8,8 @@
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "declaration": true,
-    "exclude": ["src/web", "node_modules", "dist"]
+    "declaration": true
   },
-  "include": ["src/core/**/*", "src/cli/**/*", "src/server/**/*"]
+  "include": ["src/core/**/*", "src/cli/**/*", "src/server/**/*"],
+  "exclude": ["src/web", "node_modules", "dist"]
 }

@@ -2,6 +2,7 @@ import express from 'express'
 import { join } from 'path'
 import { fileURLToPath } from 'url'
 import { agentsRouter } from './routes/agents.js'
+import { skillsRouter } from './routes/skills.js'
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url))
 
@@ -11,6 +12,7 @@ export function createApp() {
 
   // API routes
   app.use('/api/agents', agentsRouter())
+  app.use('/api/skills', skillsRouter())
 
   // Serve static web UI (only in production)
   const webDistPath = join(__dirname, '..', 'web')

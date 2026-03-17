@@ -3,6 +3,7 @@ import { join } from 'path'
 import { fileURLToPath } from 'url'
 import { agentsRouter } from './routes/agents.js'
 import { skillsRouter } from './routes/skills.js'
+import { projectsRouter } from './routes/projects.js'
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url))
 
@@ -13,6 +14,7 @@ export function createApp() {
   // API routes
   app.use('/api/agents', agentsRouter())
   app.use('/api/skills', skillsRouter())
+  app.use('/api/projects', projectsRouter())
 
   // Serve static web UI (only in production)
   const webDistPath = join(__dirname, '..', 'web')

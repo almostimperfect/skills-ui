@@ -2,6 +2,7 @@
   "name": "skills-ui",
   "version": "0.1.0",
   "description": "Visual management layer for vercel-labs/skills",
+  "license": "MIT",
   "type": "module",
   "bin": {
     "skills-ui": "./dist/cli/index.js"

@@ -10,8 +10,20 @@ Adds a Web UI and per-project enable/disable toggle on top of the `skills` CLI.
 
 ## Install
 
+Clone the repository and link it globally:
+
 ```bash
-npm install -g skills-ui
+git clone https://github.com/your-username/skills-ui.git
+cd skills-ui
+npm install
+npm run build
+npm link
+```
+
+This makes the `skills-ui` command available system-wide. To uninstall:
+
+```bash
+npm unlink -g skills-ui
 ```
 
 ## Usage
@@ -44,19 +56,6 @@ skills-ui disable skill-name --project /path/to/project --agent claude-code
 
 # List registered projects
 skills-ui projects
-```
-
-## Development
-
-```bash
-npm install
-
-# Terminal 1: backend
-npm run dev:server
-
-# Terminal 2: frontend
-npm run dev:web
-# Visit http://localhost:5173
 ```
 
 ## Supported agents

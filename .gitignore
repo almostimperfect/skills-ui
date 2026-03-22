@@ -42,3 +42,7 @@ yarn-error.log*
 .cursor/
 .aider*
 .continue/
+.agent/
+.agents/
+skills-lock.json
+

@@ -9,28 +9,20 @@ const mockRegistry = {
   updateProject: vi.fn(),
   unregisterProject: vi.fn(),
 }
-const mockStateManager = {
-  getDisabled: vi.fn().mockResolvedValue({}),
-  isDisabled: vi.fn().mockResolvedValue(false),
-  cleanupProject: vi.fn().mockResolvedValue(undefined),
-  disable: vi.fn(),
-  enable: vi.fn(),
-  cleanupSkill: vi.fn(),
+const mockInventory = {
+  reconcile: vi.fn().mockResolvedValue({ skills: {} }),
+  listSkills: vi.fn().mockResolvedValue([]),
 }
 
 vi.mock('../../src/core/projects.js', () => ({
   createProjectRegistry: vi.fn(() => mockRegistry),
 }))
-vi.mock('../../src/core/state.js', () => ({
-  createStateManager: vi.fn(() => mockStateManager),
+vi.mock('../../src/core/inventory.js', () => ({
+  createInventoryManager: vi.fn(() => mockInventory),
 }))
 vi.mock('../../src/core/skills-cli.js', () => ({
-  listSkills: vi.fn().mockResolvedValue([]),
   addSkill: vi.fn(),
-  removeSkill: vi.fn(),
-}))
-vi.mock('../../src/core/metadata.js', () => ({
-  parseSkillMetadata: vi.fn(),
+  SkillsCliError: class SkillsCliError extends Error {},
 }))
 vi.mock('fs/promises', async (importOriginal) => {
   const actual = await importOriginal<typeof import('fs/promises')>()
@@ -44,6 +36,8 @@ import { createApp } from '../../src/server/index.js'
 
 beforeEach(() => {
   vi.clearAllMocks()
+  mockInventory.listSkills.mockResolvedValue([])
+  mockInventory.reconcile.mockResolvedValue({ skills: {} })
 })
 
 describe('GET /api/projects', () => {
@@ -88,7 +82,7 @@ describe('DELETE /api/projects/:projectPath', () => {
     const encoded = encodeURIComponent('/home/user/proj')
     const res = await request(app).delete(`/api/projects/${encoded}`)
     expect(res.status).toBe(204)
-    expect(mockStateManager.cleanupProject).toHaveBeenCalledWith('/home/user/proj')
+    expect(mockInventory.reconcile).toHaveBeenCalled()
   })
 })
 
@@ -96,18 +90,33 @@ describe('GET /api/projects/:projectPath', () => {
   it('returns project with skill matrix', async () => {
     const proj = { path: '/home/user/proj', name: 'proj', agents: ['claude-code'] }
     mockRegistry.getProject.mockResolvedValue(proj)
-
-    const { listSkills } = await import('../../src/core/skills-cli.js')
-    ;(listSkills as ReturnType<typeof vi.fn>).mockResolvedValue([
-      { name: 'tdd-workflow', description: '', source: '' },
+    mockRegistry.listProjects.mockResolvedValue([proj])
+    mockInventory.listSkills.mockResolvedValue([
+      {
+        id: 'tdd-workflow-1',
+        name: 'tdd-workflow',
+        description: '',
+        source: 'owner/repo',
+        reinstallSource: 'owner/repo',
+        reinstallable: true,
+        sourceType: 'github',
+        instances: [
+          {
+            scope: 'project',
+            projectPath: '/home/user/proj',
+            path: '/home/user/proj/.claude/skills/tdd-workflow',
+            agents: ['Claude Code'],
+          },
+        ],
+      },
     ])
-    mockStateManager.isDisabled.mockResolvedValue(false)
 
     const app = createApp()
     const encoded = encodeURIComponent('/home/user/proj')
     const res = await request(app).get(`/api/projects/${encoded}`)
     expect(res.status).toBe(200)
-    expect(res.body.matrix['tdd-workflow']['claude-code']).toBe('enabled')
+    expect(res.body.skills[0].id).toBe('tdd-workflow-1')
+    expect(res.body.skills[0].status['claude-code'].state).toBe('project')
   })
 
   it('returns 404 for unknown project', async () => {

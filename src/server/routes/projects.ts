@@ -2,14 +2,14 @@ import { Router } from 'express'
 import { isAbsolute } from 'path'
 import { access } from 'fs/promises'
 import { createProjectRegistry } from '../../core/projects.js'
-import { createStateManager } from '../../core/state.js'
-import { listSkills } from '../../core/skills-cli.js'
-import { CONFIG_PATH, STATE_PATH } from '../../core/constants.js'
+import { createInventoryManager } from '../../core/inventory.js'
+import { buildProjectSkillStatus } from '../../core/status.js'
+import { ARCHIVE_DIR, CONFIG_PATH, INVENTORY_PATH } from '../../core/constants.js'
 
 export function projectsRouter(): Router {
   const router = Router()
   const registry = createProjectRegistry(CONFIG_PATH)
-  const state = createStateManager(STATE_PATH)
+  const inventory = createInventoryManager(INVENTORY_PATH, ARCHIVE_DIR)
 
   router.get('/', async (_req, res) => {
     try {
@@ -38,6 +38,8 @@ export function projectsRouter(): Router {
     }
     try {
       const project = await registry.registerProject(projectPath, agents)
+      const projects = await registry.listProjects()
+      await inventory.reconcile(projects)
       res.status(201).json(project)
     } catch {
       res.status(500).json({ error: 'Internal error' })
@@ -52,16 +54,19 @@ export function projectsRouter(): Router {
         res.status(404).json({ error: 'Project not found' })
         return
       }
-      const skills = await listSkills()
-      const matrix: Record<string, Record<string, 'enabled' | 'disabled'>> = {}
-      for (const skill of skills) {
-        matrix[skill.name] = {}
-        for (const agent of project.agents) {
-          const disabled = await state.isDisabled(projectPath, agent, skill.name)
-          matrix[skill.name][agent] = disabled ? 'disabled' : 'enabled'
-        }
-      }
-      res.json({ ...project, matrix })
+      const projects = await registry.listProjects()
+      const skills = await inventory.listSkills(projects)
+      res.json({
+        ...project,
+        skills: skills.map(skill => ({
+          id: skill.id,
+          name: skill.name,
+          description: skill.description,
+          source: skill.source,
+          reinstallable: skill.reinstallable,
+          status: buildProjectSkillStatus(skill, project),
+        })),
+      })
     } catch {
       res.status(500).json({ error: 'Internal error' })
     }
@@ -86,7 +91,8 @@ export function projectsRouter(): Router {
     const projectPath = decodeURIComponent(req.params.projectPath)
     try {
       await registry.unregisterProject(projectPath)
-      await state.cleanupProject(projectPath)
+      const projects = await registry.listProjects()
+      await inventory.reconcile(projects)
       res.status(204).send()
     } catch {
       res.status(500).json({ error: 'Internal error' })

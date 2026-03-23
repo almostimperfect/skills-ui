@@ -3,6 +3,7 @@ import { basename, join } from 'path'
 import { readJson, writeJson } from './file-store.js'
 import type { Config, Project } from './types.js'
 import { AGENT_DIRS } from './constants.js'
+import { normalizeAgentList } from './agents.js'
 
 export interface ProjectRegistry {
   listProjects(): Promise<Project[]>
@@ -14,7 +15,13 @@ export interface ProjectRegistry {
 
 export function createProjectRegistry(configPath: string): ProjectRegistry {
   async function read(): Promise<Config> {
-    return readJson<Config>(configPath, { projects: [] })
+    const config = await readJson<Config>(configPath, { projects: [] })
+    return {
+      projects: config.projects.map(project => ({
+        ...project,
+        agents: normalizeAgentList(project.agents),
+      })),
+    }
   }
 
   async function write(config: Config): Promise<void> {
@@ -54,7 +61,7 @@ export function createProjectRegistry(configPath: string): ProjectRegistry {
       const project: Project = {
         path: projectPath,
         name: basename(projectPath),
-        agents: resolvedAgents,
+        agents: normalizeAgentList(resolvedAgents),
       }
       config.projects.push(project)
       await write(config)
@@ -65,7 +72,11 @@ export function createProjectRegistry(configPath: string): ProjectRegistry {
       const config = await read()
       const idx = config.projects.findIndex(p => p.path === projectPath)
       if (idx === -1) throw new Error(`Project not found: ${projectPath}`)
-      config.projects[idx] = { ...config.projects[idx], ...updates }
+      config.projects[idx] = {
+        ...config.projects[idx],
+        ...updates,
+        ...(updates.agents ? { agents: normalizeAgentList(updates.agents) } : {}),
+      }
       await write(config)
       return config.projects[idx]
     },

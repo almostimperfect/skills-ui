@@ -1,7 +1,50 @@
 import { useParams, Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { getProject, enableSkill, disableSkill } from '../api.js'
+import { getProject, enableSkill, disableSkill, type AgentSkillStatus, type ProjectWithMatrix } from '../api.js'
 import AgentToggle from '../components/AgentToggle.js'
+
+const UNIVERSAL_PROJECT_AGENTS = new Set(['codex', 'gemini-cli'])
+
+function uniqueProjectActions(
+  project: ProjectWithMatrix,
+  action: 'enable' | 'disable',
+  projectPath: string
+): Array<Promise<unknown>> {
+  const seen = new Set<string>()
+  const requests: Array<Promise<unknown>> = []
+
+  for (const skill of project.skills) {
+    const agents = action === 'enable'
+      ? (() => {
+          const exclusiveAgents = project.agents.filter(agent =>
+            !UNIVERSAL_PROJECT_AGENTS.has(agent) && skill.status[agent]?.canEnable
+          )
+          return exclusiveAgents.length > 0
+            ? exclusiveAgents
+            : project.agents.filter(agent => skill.status[agent]?.canEnable)
+        })()
+      : project.agents.filter(agent => skill.status[agent]?.canDisable)
+
+    for (const agent of agents) {
+      const status = skill.status[agent] as AgentSkillStatus | undefined
+      const allowed = action === 'enable' ? status?.canEnable : status?.canDisable
+      if (!allowed) continue
+
+      const group = [agent, ...(status?.sharedWith ?? [])].sort()
+      const key = `${skill.id}:${action}:${group.join(',')}`
+      if (seen.has(key)) continue
+      seen.add(key)
+
+      requests.push(
+        action === 'enable'
+          ? enableSkill(skill.id, projectPath, agent)
+          : disableSkill(skill.id, projectPath, agent)
+      )
+    }
+  }
+
+  return requests
+}
 
 export default function ProjectDetail() {
   const { projectPath: encoded } = useParams<{ projectPath: string }>()
@@ -18,15 +61,7 @@ export default function ProjectDetail() {
   const enableAll = useMutation({
     mutationFn: async () => {
       if (!project) return
-      await Promise.all(
-        Object.keys(project.matrix).flatMap(skillName =>
-          project.agents.map(agent =>
-            project.matrix[skillName][agent] === 'disabled'
-              ? enableSkill(skillName, projectPath, agent)
-              : Promise.resolve()
-          )
-        )
-      )
+      await Promise.all(uniqueProjectActions(project, 'enable', projectPath))
     },
     onSuccess: () => qc.invalidateQueries({ queryKey }),
   })
@@ -34,15 +69,7 @@ export default function ProjectDetail() {
   const disableAll = useMutation({
     mutationFn: async () => {
       if (!project) return
-      await Promise.all(
-        Object.keys(project.matrix).flatMap(skillName =>
-          project.agents.map(agent =>
-            project.matrix[skillName][agent] === 'enabled'
-              ? disableSkill(skillName, projectPath, agent)
-              : Promise.resolve()
-          )
-        )
-      )
+      await Promise.all(uniqueProjectActions(project, 'disable', projectPath))
     },
     onSuccess: () => qc.invalidateQueries({ queryKey }),
   })
@@ -50,7 +77,7 @@ export default function ProjectDetail() {
   if (isLoading) return <div className="p-8 text-gray-500">Loading...</div>
   if (error || !project) return <div className="p-8 text-red-600">Failed to load project</div>
 
-  const skillNames = Object.keys(project.matrix)
+  const skills = project.skills
 
   return (
     <div className="p-8">
@@ -75,8 +102,8 @@ export default function ProjectDetail() {
         </button>
       </div>
 
-      {skillNames.length === 0 ? (
-        <p className="text-gray-400 text-sm">No skills installed globally.</p>
+      {skills.length === 0 ? (
+        <p className="text-gray-400 text-sm">No managed skills found.</p>
       ) : (
         <div className="bg-white rounded-lg border border-gray-200 overflow-x-auto">
           <table className="w-full text-sm">
@@ -91,23 +118,27 @@ export default function ProjectDetail() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {skillNames.map(skillName => (
-                <tr key={skillName}>
+              {skills.map(skill => (
+                <tr key={skill.id}>
                   <td className="px-4 py-3">
                     <Link
-                      to={`/skills/${encodeURIComponent(skillName)}`}
+                      to={`/skills/${encodeURIComponent(skill.id)}`}
                       className="text-indigo-600 hover:underline"
                     >
-                      {skillName}
+                      {skill.name}
                     </Link>
                   </td>
                   {project.agents.map(agent => (
                     <td key={agent} className="px-4 py-3 text-center">
                       <AgentToggle
-                        skillName={skillName}
+                        skillId={skill.id}
                         projectPath={projectPath}
                         agent={agent}
-                        status={project.matrix[skillName][agent] ?? 'enabled'}
+                        status={skill.status[agent] ?? {
+                          state: 'unavailable',
+                          canEnable: false,
+                          canDisable: false,
+                        }}
                         invalidateKey={queryKey}
                       />
                     </td>

@@ -44,10 +44,10 @@ export default function Skills() {
 
       <div className="bg-white rounded-lg border border-gray-200 divide-y divide-gray-100">
         {filtered?.map(skill => (
-          <div key={skill.name} className="flex items-center justify-between px-4 py-3">
+          <div key={skill.id} className="flex items-center justify-between px-4 py-3">
             <div>
               <Link
-                to={`/skills/${encodeURIComponent(skill.name)}`}
+                to={`/skills/${encodeURIComponent(skill.id)}`}
                 className="text-sm font-medium text-indigo-600 hover:underline"
               >
                 {skill.name}
@@ -55,13 +55,28 @@ export default function Skills() {
               {skill.description && (
                 <p className="text-sm text-gray-500">{skill.description}</p>
               )}
+              <div className="mt-1 flex flex-wrap gap-2 text-xs text-gray-400">
+                {skill.instances?.some(instance => instance.scope === 'global') && (
+                  <span>Global installed</span>
+                )}
+                {skill.instances?.some(instance => instance.scope === 'project') && (
+                  <span>Project installed</span>
+                )}
+                {skill.instances?.length === 0 && (
+                  <span>Catalog only</span>
+                )}
+              </div>
             </div>
-            <button
-              onClick={() => removeMutation.mutate(skill.name)}
-              className="text-sm text-red-600 hover:text-red-800"
-            >
-              Remove
-            </button>
+            {skill.instances?.some(instance => instance.scope === 'global') ? (
+              <button
+                onClick={() => removeMutation.mutate(skill.id)}
+                className="text-sm text-red-600 hover:text-red-800"
+              >
+                Remove Global
+              </button>
+            ) : (
+              <span className="text-xs text-gray-400">No global instance</span>
+            )}
           </div>
         ))}
         {filtered?.length === 0 && (

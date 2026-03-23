@@ -50,7 +50,7 @@ describe('registerProject', () => {
     const registry = createProjectRegistry(configPath)
     await registry.registerProject(projectDir, ['codex', 'gemini'])
     const projects = await registry.listProjects()
-    expect(projects[0].agents).toEqual(['codex', 'gemini'])
+    expect(projects[0].agents).toEqual(['codex', 'gemini-cli'])
   })
 })
 

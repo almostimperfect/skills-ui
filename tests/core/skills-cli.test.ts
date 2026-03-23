@@ -30,13 +30,16 @@ beforeEach(() => {
 
 describe('listSkills', () => {
   it('returns empty array when no skills installed', async () => {
-    mockSuccess('No skills installed.\n')
+    mockSuccess('[]\n')
     const skills = await listSkills()
     expect(skills).toEqual([])
   })
 
-  it('parses skill names from output lines', async () => {
-    mockSuccess('tdd-workflow\nreact-best-practices\n')
+  it('parses skill names from JSON output', async () => {
+    mockSuccess(JSON.stringify([
+      { name: 'tdd-workflow', path: '/tmp/tdd-workflow', scope: 'global', agents: [] },
+      { name: 'react-best-practices', path: '/tmp/react-best-practices', scope: 'global', agents: ['Codex'] },
+    ]))
     const skills = await listSkills()
     expect(skills.map(s => s.name)).toEqual(['tdd-workflow', 'react-best-practices'])
   })

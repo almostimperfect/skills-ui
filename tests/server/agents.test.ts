@@ -11,7 +11,7 @@ describe('GET /api/agents', () => {
     expect(res.status).toBe(200)
     expect(res.body).toContain('claude-code')
     expect(res.body).toContain('codex')
-    expect(res.body).toContain('gemini')
+    expect(res.body).toContain('gemini-cli')
     expect(res.body).toContain('antigravity')
   })
 })

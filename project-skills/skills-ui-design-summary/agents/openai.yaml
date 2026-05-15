@@ -1,0 +1,5 @@
+interface:
+  display_name: "skills-ui Design Summary"
+  short_description: "Review drift and sync skills-ui docs"
+  default_prompt: "Review the current skills-ui work against docs/PRODUCT_DESIGN.md, docs/TODOLIST.md, DEVELOPMENT.md, and README.md. Update stale project memory only where product or implementation reality changed, then run feasible validation and summarize the remaining highest-priority gap."
+

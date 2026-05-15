@@ -5,6 +5,8 @@ import request from 'supertest'
 const mockRegistryInstance = {
   listProjects: vi.fn().mockResolvedValue([]),
   getProject: vi.fn().mockResolvedValue(undefined),
+  getGlobalAgents: vi.fn().mockResolvedValue(['codex']),
+  updateGlobalAgents: vi.fn(),
   registerProject: vi.fn(),
   updateProject: vi.fn(),
   unregisterProject: vi.fn(),
@@ -15,7 +17,9 @@ const mockInventoryInstance = {
   listSkills: vi.fn(),
   getSkill: vi.fn(),
   resolveSkillRef: vi.fn(),
+  addGlobalSkillFromSource: vi.fn().mockResolvedValue(undefined),
   enableProjectSkill: vi.fn().mockResolvedValue(undefined),
+  installGlobalSkill: vi.fn().mockResolvedValue(undefined),
   disableProjectSkill: vi.fn().mockResolvedValue(undefined),
   updateGlobalSkill: vi.fn().mockResolvedValue(undefined),
   removeGlobalSkill: vi.fn().mockResolvedValue(undefined),
@@ -24,7 +28,6 @@ const mockInventoryInstance = {
 const mockGetSkillMaintenance = vi.fn()
 
 vi.mock('../../src/core/skills-cli.js', () => ({
-  addSkill: vi.fn(),
   SkillsCliError: class SkillsCliError extends Error {},
 }))
 vi.mock('../../src/core/projects.js', () => ({
@@ -37,17 +40,15 @@ vi.mock('../../src/core/maintenance.js', () => ({
   getSkillMaintenance: (...args: unknown[]) => mockGetSkillMaintenance(...args),
 }))
 
-import { addSkill } from '../../src/core/skills-cli.js'
 import { createApp } from '../../src/server/index.js'
 
-const mockAdd = addSkill as ReturnType<typeof vi.fn>
-
 beforeEach(() => {
-  mockAdd.mockReset()
   mockInventoryInstance.listSkills.mockReset()
   mockInventoryInstance.getSkill.mockReset()
   mockInventoryInstance.resolveSkillRef.mockReset()
+  mockInventoryInstance.addGlobalSkillFromSource.mockReset()
   mockInventoryInstance.enableProjectSkill.mockReset()
+  mockInventoryInstance.installGlobalSkill.mockReset()
   mockInventoryInstance.disableProjectSkill.mockReset()
   mockInventoryInstance.updateGlobalSkill.mockReset()
   mockInventoryInstance.removeGlobalSkill.mockReset()
@@ -55,6 +56,7 @@ beforeEach(() => {
   mockInventoryInstance.reconcile.mockReset()
   mockGetSkillMaintenance.mockReset()
   mockRegistryInstance.listProjects.mockResolvedValue([])
+  mockRegistryInstance.getGlobalAgents.mockResolvedValue(['codex'])
 })
 
 describe('GET /api/skills', () => {
@@ -70,13 +72,12 @@ describe('GET /api/skills', () => {
 })
 
 describe('POST /api/skills', () => {
-  it('calls addSkill and returns 201', async () => {
-    mockAdd.mockResolvedValue(undefined)
-    mockInventoryInstance.reconcile.mockResolvedValue({ skills: {} })
+  it('adds a global skill through inventory and returns 201', async () => {
+    mockInventoryInstance.addGlobalSkillFromSource.mockResolvedValue(undefined)
     const app = createApp()
     const res = await request(app).post('/api/skills').send({ source: 'owner/repo' })
     expect(res.status).toBe(201)
-    expect(mockAdd).toHaveBeenCalledWith('owner/repo', { global: true })
+    expect(mockInventoryInstance.addGlobalSkillFromSource).toHaveBeenCalledWith('owner/repo', [], ['codex'])
   })
 
   it('returns 400 when source is missing', async () => {
@@ -181,7 +182,44 @@ describe('POST /api/skills/:name/update', () => {
     const app = createApp()
     const res = await request(app).post('/api/skills/tdd-workflow/update')
     expect(res.status).toBe(200)
-    expect(mockInventoryInstance.updateGlobalSkill).toHaveBeenCalledWith('tdd-workflow-1', [])
+    expect(mockInventoryInstance.updateGlobalSkill).toHaveBeenCalledWith('tdd-workflow-1', [], ['codex'])
+  })
+})
+
+describe('POST /api/skills/:name/install-global', () => {
+  it('installs a known asset globally from its recorded source', async () => {
+    mockInventoryInstance.resolveSkillRef.mockResolvedValue({
+      id: 'tdd-workflow-1',
+      name: 'tdd-workflow',
+      description: '',
+      source: 'owner/repo',
+      reinstallSource: 'owner/repo',
+      reinstallable: true,
+      sourceType: 'github',
+      instances: [{ scope: 'project', path: '/home/user/proj/.agents/skills/tdd-workflow', agents: [] }],
+    })
+
+    const app = createApp()
+    const res = await request(app).post('/api/skills/tdd-workflow/install-global')
+    expect(res.status).toBe(200)
+    expect(mockInventoryInstance.installGlobalSkill).toHaveBeenCalledWith('tdd-workflow-1', [], ['codex'])
+  })
+
+  it('returns 409 when the asset has no reinstall source', async () => {
+    mockInventoryInstance.resolveSkillRef.mockResolvedValue({
+      id: 'tdd-workflow-1',
+      name: 'tdd-workflow',
+      description: '',
+      source: '',
+      reinstallSource: '',
+      reinstallable: false,
+      sourceType: 'unknown',
+      instances: [],
+    })
+
+    const app = createApp()
+    const res = await request(app).post('/api/skills/tdd-workflow/install-global')
+    expect(res.status).toBe(409)
   })
 })
 

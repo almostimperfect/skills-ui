@@ -8,23 +8,23 @@ const navItems = [
 
 export default function Layout() {
   return (
-    <div className="flex h-screen bg-gray-50">
-      {/* Sidebar */}
-      <aside className="w-56 bg-white border-r border-gray-200 flex flex-col">
-        <div className="px-5 py-4 border-b border-gray-200">
-          <span className="text-lg font-semibold text-gray-900">skills-ui</span>
+    <div className="min-h-screen bg-slate-50 text-slate-950 md:flex md:h-screen">
+      <aside className="border-b border-slate-200 bg-white md:flex md:w-60 md:flex-col md:border-b-0 md:border-r">
+        <div className="px-4 py-4 md:border-b md:border-slate-200 md:px-5">
+          <span className="text-base font-semibold tracking-tight text-slate-950">skills-ui</span>
+          <p className="mt-1 hidden text-xs text-slate-500 md:block">Local skill assets</p>
         </div>
-        <nav className="flex-1 px-3 py-4 space-y-1">
+        <nav className="flex gap-1 overflow-x-auto px-3 pb-3 md:flex-1 md:flex-col md:space-y-1 md:overflow-visible md:py-4">
           {navItems.map(({ to, label, exact }) => (
             <NavLink
               key={to}
               to={to}
               end={exact}
               className={({ isActive }) =>
-                `block px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                `whitespace-nowrap rounded-md px-3 py-2 text-sm font-medium transition-colors ${
                   isActive
-                    ? 'bg-indigo-50 text-indigo-700'
-                    : 'text-gray-700 hover:bg-gray-100'
+                    ? 'bg-slate-950 text-white'
+                    : 'text-slate-600 hover:bg-slate-100 hover:text-slate-950'
                 }`
               }
             >
@@ -33,8 +33,7 @@ export default function Layout() {
           ))}
         </nav>
       </aside>
-      {/* Main */}
-      <main className="flex-1 overflow-auto">
+      <main className="min-w-0 flex-1 overflow-auto">
         <Outlet />
       </main>
     </div>

@@ -16,6 +16,17 @@ dist/
 # Test coverage
 coverage/
 
+# Local manual QA fixtures
+.xtest/
+
+# Browser test artifacts
+.playwright-mcp/
+playwright-report/
+test-results/
+
+# Local scratch space
+temp/
+
 # Logs
 *.log
 npm-debug.log*

@@ -1,6 +1,6 @@
 # Development
 
-Status snapshot: 2026-03-23
+Status snapshot: 2026-05-07
 
 ## Requirements
 
@@ -34,21 +34,27 @@ npm run dev:web      # Vite dev server on http://localhost:5173
 
 ## R&D Direction
 
-The project no longer tries to be a custom symlink manager sitting beside `skills`.
+Product-facing design notes live in [docs/PRODUCT_DESIGN.md](./docs/PRODUCT_DESIGN.md), and the lightweight prioritized backlog lives in [docs/TODOLIST.md](./docs/TODOLIST.md).
+
+The project is a local asset manager that remains compatible with `skills` without delegating all state to that CLI.
 
 The current direction is:
 
-- Reuse the `skills` / `skills.sh` ecosystem for discovery, installation, removal, lock files, and agent integration.
+- Reuse the `skills` / `skills.sh` ecosystem for source compatibility, lock metadata, and fallback handling.
+- Discover installed instances from managed filesystem paths first, then merge `skills list --json` output as compatibility data.
+- Install and remove local/archive-backed assets by writing the concrete target directories without writing upstream `skills` locks by default.
+- Install, remove, and update remote CLI-managed assets through `skills` so the CLI maintains its own lock metadata.
 - Let `skills-ui` own metadata, inventory, reconciliation, and higher-level management workflows.
 - Manage a concrete machine-level scope:
-  - global skills from `skills list -g --json`
-  - project skills from every registered project via `skills list --json`
+  - global skills from managed global skill directories plus `skills list -g --json`
+  - project skills from registered project skill directories plus per-project `skills list --json`
 - Keep "skill exists" separate from "skill is currently installed anywhere".
 
 This is the central product idea:
 
 - `inventory` remembers what this machine knows about.
-- `skills add/remove` remain the primitive install/uninstall mechanism.
+- direct directory copy/remove is the primitive install/uninstall mechanism for local/archive-backed assets.
+- `skills add/remove/update` are the primary adapters for remote CLI-managed assets and fallback adapters when a source or target cannot be resolved directly.
 - project enable/disable means project-local add/remove, not manual link mutation.
 - source-less skills are archived immediately so later external deletions do not corrupt metadata.
 
@@ -56,17 +62,19 @@ This is the central product idea:
 
 ### 1. Discovery
 
-All discovery goes through the bundled `skills` CLI.
+Discovery is adapter-based and filesystem-first.
 
-- global discovery: `skills list -g --json`
-- project discovery: `skills list --json` with project `cwd`
+- global discovery scans known global skill dirs for managed agents, then merges `skills list -g --json`
+- project discovery scans registered project skill dirs for enabled agents, then merges `skills list --json` with project `cwd`
+- duplicate reports are merged by scope, path, and project
+- one broken project or CLI failure is skipped for that adapter pass instead of failing the whole catalog
 
 Relevant files:
 
 - [src/core/skills-cli.ts](./src/core/skills-cli.ts)
 - [src/core/inventory.ts](./src/core/inventory.ts)
 
-This avoids hardcoding directory scanning rules that may drift from upstream `skills`.
+This keeps manual filesystem edits and `skills` CLI edits compatible while letting `skills-ui` maintain its own asset model.
 
 ### 2. Project Registry
 
@@ -86,6 +94,8 @@ Projects store:
 
 Agent IDs are normalized, for example `gemini` becomes `gemini-cli`.
 
+The same config also stores optional global enabled agents. Global install actions pass these agents to `skills add -g --agent ...` so `skills-ui` does not rely on upstream CLI default targets.
+
 ### 3. Inventory and Archive
 
 Machine-level skill catalog is stored in:
@@ -100,8 +110,10 @@ Relevant file:
 Important rules:
 
 - inventory entries use a stable `id`, not just `name`
-- `id` is derived from `name + sourceType + sourceRef`
+- `id` is derived from `name + current skill content hash` when live/archive content is readable
+- `name + sourceType + sourceRef` remains the fallback identity
 - this prevents cross-source name collisions in the UI/API
+- same-content global and project installs reconcile into one asset
 - inventory entries remain even if all live instances disappear
 - source-less skills are archived immediately on discovery
 - archive copies are keyed by name plus path hash to avoid collisions
@@ -151,18 +163,22 @@ Reported update states:
 Current semantics:
 
 - add global skill:
-  - `skills add ... -g`
+  - direct copy to configured global agent dirs when source is local/archive-backed
+  - use `skills add ... -g --agent <enabled-agent>` for remote or unresolved sources
 - remove global skill:
-  - `skills remove <name> -g`
+  - delete discovered global instance directories for local/archive/manual assets
+  - use `skills remove <name> -g` for CLI-managed remote assets or unresolved targets
 - enable for project:
-  - project-local `skills add`
+  - direct copy to the project agent directory for local/archive-backed assets without writing `skills-lock.json`
+  - use project-local `skills add --skill <name>` for CLI-managed remote assets or unresolved sources
 - disable for project:
-  - project-local `skills remove`
+  - delete the project agent directory for local/archive/manual assets without mutating `skills-lock.json`
+  - use project-local `skills remove` for CLI-managed remote assets or unresolved targets
 - split global:
   - install project-local copies into registered projects that currently inherit the skill
   - remove the global instance afterward
 - update global:
-  - reinstall the managed global skill from recorded source
+  - use `skills` for remote sources and direct copy/archive metadata for local sources
 
 The code path for most of this now runs through:
 
@@ -193,10 +209,10 @@ Validation status:
 - `npm run build:web` passes
 - `npm test` passes
 
-As of 2026-03-23:
+As of 2026-05-07:
 
 - 10 test files
-- 43 tests passing
+- 61 tests passing
 
 ## File Map
 

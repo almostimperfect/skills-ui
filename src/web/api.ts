@@ -69,6 +69,11 @@ export interface ProjectWithMatrix extends Project {
   }>
 }
 
+export interface GlobalAgentConfig {
+  supported: string[]
+  enabled: string[]
+}
+
 // Skills
 export const getSkills = () =>
   fetch(`${BASE}/skills`).then(r => json<Skill[]>(r))
@@ -115,6 +120,11 @@ export const updateSkill = (id: string) =>
     method: 'POST',
   }).then(r => json<{ ok: boolean }>(r))
 
+export const installGlobalSkill = (id: string) =>
+  fetch(`${BASE}/skills/${encodeURIComponent(id)}/install-global`, {
+    method: 'POST',
+  }).then(r => json<{ ok: boolean }>(r))
+
 // Projects
 export const getProjects = () =>
   fetch(`${BASE}/projects`).then(r => json<Project[]>(r))
@@ -146,3 +156,13 @@ export const unregisterProject = (projectPath: string) =>
 // Agents
 export const getAgents = () =>
   fetch(`${BASE}/agents`).then(r => json<string[]>(r))
+
+export const getGlobalAgents = () =>
+  fetch(`${BASE}/agents/global`).then(r => json<GlobalAgentConfig>(r))
+
+export const updateGlobalAgents = (agents: string[]) =>
+  fetch(`${BASE}/agents/global`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ agents }),
+  }).then(r => json<GlobalAgentConfig>(r))

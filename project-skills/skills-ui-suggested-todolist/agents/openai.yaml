@@ -1,0 +1,5 @@
+interface:
+  display_name: "skills-ui Todolist"
+  short_description: "Refresh the skills-ui product backlog"
+  default_prompt: "Refresh docs/TODOLIST.md for skills-ui from docs/PRODUCT_DESIGN.md, DEVELOPMENT.md, README.md, and the current implementation state. Keep it short, prioritized, and focused on asset-management, reconciliation, UI/UX, and testing work."
+

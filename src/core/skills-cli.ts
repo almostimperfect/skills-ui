@@ -1,4 +1,5 @@
 import { execFile } from 'child_process'
+import { existsSync } from 'fs'
 import { fileURLToPath } from 'url'
 import { join, dirname } from 'path'
 import type { DiscoveredSkill, Skill } from './types.js'
@@ -9,7 +10,19 @@ const ADD_TIMEOUT = 120_000
 // Resolve path to the bundled `skills` binary from node_modules to avoid
 // picking up a different version that may be on PATH via `npx`.
 const __dirname = dirname(fileURLToPath(import.meta.url))
-const SKILLS_BIN = join(__dirname, '..', '..', 'node_modules', '.bin', 'skills')
+const SKILLS_BIN = resolveSkillsBin(__dirname)
+
+function resolveSkillsBin(startDir: string): string {
+  let current = startDir
+  while (true) {
+    const candidate = join(current, 'node_modules', '.bin', 'skills')
+    if (existsSync(candidate)) return candidate
+
+    const parent = dirname(current)
+    if (parent === current) return join(startDir, '..', '..', 'node_modules', '.bin', 'skills')
+    current = parent
+  }
+}
 
 export class SkillsCliError extends Error {
   constructor(

@@ -1,6 +1,6 @@
 import { homedir } from 'os'
 import { join } from 'path'
-import { readJson } from './file-store.js'
+import { readJson, writeJson } from './file-store.js'
 
 export interface GlobalSkillLockEntry {
   source?: string
@@ -48,4 +48,12 @@ export async function readGlobalSkillLock(): Promise<GlobalSkillLock> {
 
 export async function readLocalSkillLock(cwd: string): Promise<LocalSkillLock> {
   return readJson<LocalSkillLock>(getLocalSkillLockPath(cwd), { version: 1, skills: {} })
+}
+
+export async function writeGlobalSkillLock(lock: GlobalSkillLock): Promise<void> {
+  await writeJson(getGlobalSkillLockPath(), lock)
+}
+
+export async function writeLocalSkillLock(cwd: string, lock: LocalSkillLock): Promise<void> {
+  await writeJson(getLocalSkillLockPath(cwd), lock)
 }

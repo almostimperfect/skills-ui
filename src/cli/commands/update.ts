@@ -16,7 +16,7 @@ export function updateCommand(): Command {
         if (!skill) {
           throw new Error(`Skill not found: ${ref}`)
         }
-        await inventory.updateGlobalSkill(skill.id, projects)
+        await inventory.updateGlobalSkill(skill.id, projects, await registry.getGlobalAgents())
         console.log(`✓ Updated global skill ${skill.name}`)
       } catch (err) {
         console.error(`Error: ${err instanceof Error ? err.message : String(err)}`)

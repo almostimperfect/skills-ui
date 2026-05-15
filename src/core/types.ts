@@ -57,6 +57,8 @@ export interface Project {
 
 export interface Config {
   projects: Project[]
+  /** Which AI tools skills-ui manages for global installs. */
+  globalAgents?: AgentId[]
 }
 
 export type SkillState = 'project' | 'global' | 'available' | 'unavailable'

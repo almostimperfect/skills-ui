@@ -80,53 +80,66 @@ export default function ProjectDetail() {
   const skills = project.skills
 
   return (
-    <div className="p-8">
-      <Link to="/projects" className="text-sm text-indigo-600 hover:underline mb-4 inline-block">
+    <div className="mx-auto max-w-7xl p-4 sm:p-6 lg:p-8">
+      <Link to="/projects" className="mb-4 inline-block text-sm font-medium text-slate-600 hover:text-slate-950">
         ← Back to Projects
       </Link>
-      <h1 className="text-2xl font-bold text-gray-900 mb-1">{project.name}</h1>
-      <p className="text-xs text-gray-400 mb-6">{project.path}</p>
+      <h1 className="mb-1 text-2xl font-semibold tracking-tight text-slate-950">{project.name}</h1>
+      <p className="mb-6 break-all text-xs text-slate-400">{project.path}</p>
 
-      <div className="flex gap-2 mb-4">
+      <div className="mb-4 rounded-lg border border-slate-200 bg-white p-4">
+        <p className="text-sm font-medium text-slate-950">Project skill status</p>
+        <div className="mt-2 grid gap-2 text-xs text-slate-600 sm:grid-cols-2 lg:grid-cols-4">
+          <p><span className="font-medium text-slate-800">Project install</span>: installed directly in this project.</p>
+          <p><span className="font-medium text-slate-800">Global install</span>: inherited from a global install.</p>
+          <p><span className="font-medium text-slate-800">Can install</span>: asset is known and can be installed here.</p>
+          <p><span className="font-medium text-slate-800">No source</span>: asset exists, but cannot be reinstalled safely.</p>
+        </div>
+      </div>
+
+      <div className="mb-4 flex flex-wrap gap-2">
         <button
           onClick={() => enableAll.mutate()}
-          className="px-3 py-1.5 text-xs bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-md hover:bg-indigo-100"
+          className="rounded-md border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-800 hover:bg-slate-50"
         >
-          Enable all
+          Install all available
         </button>
         <button
           onClick={() => disableAll.mutate()}
-          className="px-3 py-1.5 text-xs bg-gray-50 text-gray-600 border border-gray-200 rounded-md hover:bg-gray-100"
+          className="rounded-md border border-red-200 bg-white px-3 py-2 text-xs font-medium text-red-700 hover:bg-red-50"
         >
-          Disable all
+          Uninstall project installs
         </button>
       </div>
 
       {skills.length === 0 ? (
-        <p className="text-gray-400 text-sm">No managed skills found.</p>
+        <p className="text-sm text-slate-400">No managed skills found.</p>
       ) : (
-        <div className="bg-white rounded-lg border border-gray-200 overflow-x-auto">
+        <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-gray-200 bg-gray-50">
-                <th className="text-left px-4 py-3 font-medium text-gray-600">Skill</th>
+              <tr className="border-b border-slate-200 bg-slate-50">
+                <th className="px-4 py-3 text-left font-medium text-slate-600">Skill asset</th>
                 {project.agents.map(agent => (
-                  <th key={agent} className="text-center px-4 py-3 font-medium text-gray-600">
+                  <th key={agent} className="px-4 py-3 text-center font-medium text-slate-600">
                     {agent}
                   </th>
                 ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-y divide-slate-100">
               {skills.map(skill => (
                 <tr key={skill.id}>
                   <td className="px-4 py-3">
                     <Link
                       to={`/skills/${encodeURIComponent(skill.id)}`}
-                      className="text-indigo-600 hover:underline"
+                      className="font-medium text-slate-950 hover:underline"
                     >
                       {skill.name}
                     </Link>
+                    {skill.description && (
+                      <p className="mt-1 line-clamp-2 max-w-lg text-xs leading-5 text-slate-500">{skill.description}</p>
+                    )}
                   </td>
                   {project.agents.map(agent => (
                     <td key={agent} className="px-4 py-3 text-center">

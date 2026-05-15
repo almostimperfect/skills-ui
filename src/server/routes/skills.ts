@@ -1,5 +1,5 @@
 import { Router } from 'express'
-import { addSkill, SkillsCliError } from '../../core/skills-cli.js'
+import { SkillsCliError } from '../../core/skills-cli.js'
 import { getActionAgentsForStatus, buildProjectSkillStatus, buildSkillStatusMap } from '../../core/status.js'
 import { createProjectRegistry } from '../../core/projects.js'
 import { createInventoryManager } from '../../core/inventory.js'
@@ -73,9 +73,9 @@ export function skillsRouter(): Router {
       return
     }
     try {
-      await addSkill(source, { global: true })
+      const globalAgents = await registry.getGlobalAgents()
       const projects = await registry.listProjects()
-      await inventory.reconcile(projects)
+      await inventory.addGlobalSkillFromSource(source, projects, globalAgents)
       res.status(201).json({ ok: true })
     } catch (err) {
       if (isAmbiguousSkillError(err)) {
@@ -117,12 +117,41 @@ export function skillsRouter(): Router {
   router.post('/:name/update', async (req, res) => {
     try {
       const projects = await registry.listProjects()
+      const globalAgents = await registry.getGlobalAgents()
       const skill = await inventory.resolveSkillRef(req.params.name, projects)
       if (!skill) {
         res.status(404).json({ error: 'Skill not found' })
         return
       }
-      await inventory.updateGlobalSkill(skill.id, projects)
+      await inventory.updateGlobalSkill(skill.id, projects, globalAgents)
+      res.json({ ok: true })
+    } catch (err) {
+      if (isAmbiguousSkillError(err)) {
+        res.status(409).json({ error: err instanceof Error ? err.message : 'Ambiguous skill reference' })
+        return
+      }
+      if (err instanceof SkillsCliError) {
+        res.status(422).json({ error: err.message })
+      } else {
+        res.status(500).json({ error: err instanceof Error ? err.message : 'Internal error' })
+      }
+    }
+  })
+
+  router.post('/:name/install-global', async (req, res) => {
+    try {
+      const projects = await registry.listProjects()
+      const globalAgents = await registry.getGlobalAgents()
+      const skill = await inventory.resolveSkillRef(req.params.name, projects)
+      if (!skill) {
+        res.status(404).json({ error: 'Skill not found' })
+        return
+      }
+      if (!skill.reinstallable || !skill.reinstallSource) {
+        res.status(409).json({ error: 'This skill does not have a reinstall source and cannot be installed globally.' })
+        return
+      }
+      await inventory.installGlobalSkill(skill.id, projects, globalAgents)
       res.json({ ok: true })
     } catch (err) {
       if (isAmbiguousSkillError(err)) {

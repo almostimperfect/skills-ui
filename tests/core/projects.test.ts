@@ -1,6 +1,6 @@
 // tests/core/projects.test.ts
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { mkdtemp, rm, mkdir } from 'fs/promises'
+import { mkdtemp, rm, mkdir, writeFile } from 'fs/promises'
 import { tmpdir } from 'os'
 import { join } from 'path'
 import { createProjectRegistry } from '../../src/core/projects.js'
@@ -60,6 +60,14 @@ describe('getProject', () => {
     const project = await registry.getProject('/does/not/exist')
     expect(project).toBeUndefined()
   })
+
+  it('backfills missing persisted project names from path', async () => {
+    await writeFile(configPath, JSON.stringify({ projects: [{ path: projectDir, agents: ['codex'] }] }))
+    const registry = createProjectRegistry(configPath)
+    const project = await registry.getProject(projectDir)
+    expect(project?.name).toBe('my-project')
+    expect(project?.agents).toEqual(['codex'])
+  })
 })
 
 describe('updateProject', () => {
@@ -70,6 +78,29 @@ describe('updateProject', () => {
     const project = await registry.getProject(projectDir)
     expect(project?.name).toBe('custom')
     expect(project?.agents).toEqual(['codex'])
+  })
+
+  it('preserves name when only agents are updated', async () => {
+    const registry = createProjectRegistry(configPath)
+    await registry.registerProject(projectDir)
+    await registry.updateProject(projectDir, { agents: ['codex'] })
+    const project = await registry.getProject(projectDir)
+    expect(project?.name).toBe('my-project')
+    expect(project?.agents).toEqual(['codex'])
+  })
+})
+
+describe('global agents', () => {
+  it('defaults global agents from registered projects', async () => {
+    const registry = createProjectRegistry(configPath)
+    await registry.registerProject(projectDir, ['codex', 'gemini'])
+    expect(await registry.getGlobalAgents()).toEqual(['codex', 'gemini-cli'])
+  })
+
+  it('updates global agents explicitly', async () => {
+    const registry = createProjectRegistry(configPath)
+    await registry.updateGlobalAgents(['claude-code'])
+    expect(await registry.getGlobalAgents()).toEqual(['claude-code'])
   })
 })
 

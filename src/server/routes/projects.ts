@@ -5,6 +5,8 @@ import { createProjectRegistry } from '../../core/projects.js'
 import { createInventoryManager } from '../../core/inventory.js'
 import { buildProjectSkillStatus } from '../../core/status.js'
 import { ARCHIVE_DIR, CONFIG_PATH, INVENTORY_PATH } from '../../core/constants.js'
+import { SUPPORTED_AGENTS } from '../../core/constants.js'
+import { normalizeAgentList } from '../../core/agents.js'
 
 export function projectsRouter(): Router {
   const router = Router()
@@ -29,6 +31,18 @@ export function projectsRouter(): Router {
     if (!isAbsolute(projectPath)) {
       res.status(400).json({ error: 'path must be an absolute path' })
       return
+    }
+    if (agents) {
+      const normalized = normalizeAgentList(agents)
+      if (normalized.length === 0) {
+        res.status(400).json({ error: 'at least one project agent must be enabled' })
+        return
+      }
+      const invalid = normalized.filter(agent => !(SUPPORTED_AGENTS as string[]).includes(agent))
+      if (invalid.length > 0) {
+        res.status(400).json({ error: `unsupported agents: ${invalid.join(', ')}` })
+        return
+      }
     }
     try {
       await access(projectPath)
@@ -75,6 +89,18 @@ export function projectsRouter(): Router {
   router.patch('/:projectPath', async (req, res) => {
     const projectPath = decodeURIComponent(req.params.projectPath)
     const { name, agents } = req.body as { name?: string; agents?: string[] }
+    if (agents) {
+      const normalized = normalizeAgentList(agents)
+      if (normalized.length === 0) {
+        res.status(400).json({ error: 'at least one project agent must be enabled' })
+        return
+      }
+      const invalid = normalized.filter(agent => !(SUPPORTED_AGENTS as string[]).includes(agent))
+      if (invalid.length > 0) {
+        res.status(400).json({ error: `unsupported agents: ${invalid.join(', ')}` })
+        return
+      }
+    }
     try {
       const updated = await registry.updateProject(projectPath, { name, agents })
       res.json(updated)

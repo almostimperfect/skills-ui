@@ -5,6 +5,8 @@ import request from 'supertest'
 const mockRegistry = {
   listProjects: vi.fn(),
   getProject: vi.fn(),
+  getGlobalAgents: vi.fn(),
+  updateGlobalAgents: vi.fn(),
   registerProject: vi.fn(),
   updateProject: vi.fn(),
   unregisterProject: vi.fn(),
@@ -137,5 +139,16 @@ describe('PATCH /api/projects/:projectPath', () => {
     const res = await request(app).patch(`/api/projects/${encoded}`).send({ name: 'new-name' })
     expect(res.status).toBe(200)
     expect(res.body.name).toBe('new-name')
+  })
+
+  it('updates project agents without requiring a name', async () => {
+    const updated = { path: '/home/user/proj', name: 'proj', agents: ['codex'] }
+    mockRegistry.updateProject.mockResolvedValue(updated)
+    const app = createApp()
+    const encoded = encodeURIComponent('/home/user/proj')
+    const res = await request(app).patch(`/api/projects/${encoded}`).send({ agents: ['codex'] })
+    expect(res.status).toBe(200)
+    expect(res.body.name).toBe('proj')
+    expect(mockRegistry.updateProject).toHaveBeenCalledWith('/home/user/proj', { name: undefined, agents: ['codex'] })
   })
 })

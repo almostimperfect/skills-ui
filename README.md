@@ -5,6 +5,7 @@ Visual management layer for [vercel-labs/skills](https://github.com/vercel-labs/
 Adds a Web UI, managed project inventory, archive-backed reinstall sources, global/project status tracking, and maintenance actions on top of the `skills` CLI.
 
 For architecture, current status, and remaining design notes, see [DEVELOPMENT.md](./DEVELOPMENT.md).
+For product direction, see [docs/PRODUCT_DESIGN.md](./docs/PRODUCT_DESIGN.md) and [docs/TODOLIST.md](./docs/TODOLIST.md).
 
 ## Requirements
 

@@ -47,7 +47,7 @@ test.describe('GET /api/skills/:name — direct disk metadata (unaffected by BUG
     expect(((await spaced.json()) as { name: string }).name).toBe('spaced skill')
   })
 
-  test.fixme('UX-001/F-WEB-06: unknown skill must return 404, not a 200 placeholder', async ({ request }) => {
+  test('UX-001/F-WEB-06: unknown skill must return 404, not a 200 placeholder', async ({ request }) => {
     const res = await request.get('/api/skills/does-not-exist')
     expect(res.status()).toBe(404)
   })
@@ -79,7 +79,7 @@ test.describe('POST /api/skills/:name/enable|disable — validation contract', (
     }
   })
 
-  test.fixme('DEBT-001: enable for an unregistered project must be rejected (404), not accepted', async ({ request, server }) => {
+  test('DEBT-001: enable for an unregistered project must be rejected (404), not accepted', async ({ request, server }) => {
     await seedSkill(server.home, 'basic-skill')
     const res = await request.post('/api/skills/basic-skill/enable', {
       data: { projectPath: '/not/registered', agent: 'claude-code' },

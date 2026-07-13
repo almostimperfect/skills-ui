@@ -53,12 +53,12 @@ export function projectsRouter(): Router {
         return
       }
       const skills = await listSkills()
+      const disabled = await state.getDisabled(projectPath)
       const matrix: Record<string, Record<string, 'enabled' | 'disabled'>> = {}
       for (const skill of skills) {
         matrix[skill.name] = {}
         for (const agent of project.agents) {
-          const disabled = await state.isDisabled(projectPath, agent, skill.name)
-          matrix[skill.name][agent] = disabled ? 'disabled' : 'enabled'
+          matrix[skill.name][agent] = disabled[agent]?.includes(skill.name) ? 'disabled' : 'enabled'
         }
       }
       res.json({ ...project, matrix })

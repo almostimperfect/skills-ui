@@ -77,7 +77,7 @@ test.describe('CLI: enable/disable validation gaps (registered findings)', () =>
     expect(res.code).toBe(1)
   })
 
-  test.fixme('DEBT-002/F-CLI-03: enabling an uninstalled skill must not create a dangling symlink', async ({ server }) => {
+  test('DEBT-002/F-CLI-03: enabling an uninstalled skill must not create a dangling symlink', async ({ server }) => {
     const proj = await makeProject(server.home, 'proj-e', { agentDirs: ['.claude'] })
     const res = await runCli(server.home, ['enable', 'ghost-skill', '--project', proj, '--agent', 'claude-code'])
     // DESIRED: rejected. ACTUAL today: exit 0 and a dangling link at .claude/skills/ghost-skill.

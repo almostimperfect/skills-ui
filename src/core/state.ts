@@ -1,4 +1,4 @@
-import { symlink, unlink, mkdir } from 'fs/promises'
+import { access, symlink, unlink, mkdir } from 'fs/promises'
 import { join } from 'path'
 import { homedir } from 'os'
 import { readJson, writeJson } from './file-store.js'
@@ -55,6 +55,12 @@ export function createStateManager(statePath: string, canonicalBaseDir?: string)
     },
 
     async enable(projectPath, agent, skillName, agentDirs) {
+      const target = join(baseDir, CANONICAL_SKILLS_DIR, skillName)
+      try {
+        await access(target)
+      } catch {
+        throw new Error(`Skill not installed: ${skillName}`)
+      }
       // Write state first so it's consistent even if the symlink creation fails
       const state = await read()
       if (state.disabled[projectPath]?.[agent]) {
@@ -75,7 +81,6 @@ export function createStateManager(statePath: string, canonicalBaseDir?: string)
         const agentSkillsDir = join(projectPath, agentRelDir)
         await mkdir(agentSkillsDir, { recursive: true })
         const symlinkPath = join(agentSkillsDir, skillName)
-        const target = join(baseDir, CANONICAL_SKILLS_DIR, skillName)
         try {
           await symlink(target, symlinkPath)
         } catch (e: unknown) {

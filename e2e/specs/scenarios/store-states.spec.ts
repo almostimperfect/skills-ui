@@ -103,9 +103,9 @@ test.describe('Broken store states must not take the product down', () => {
     await runCli(server.home, ['enable', 'basic-skill', '--project', proj, '--agent', 'claude-code'])
     await removeCanonical(server.home, 'basic-skill')
 
-    // Detail degrades to placeholder (UX-001 territory) but must not 500
+    // Missing canonical truth is a not-found response (UX-001), never a 500.
     const detail = await request.get('/api/skills/basic-skill')
-    expect(detail.status()).toBe(200)
+    expect(detail.status()).toBe(404)
 
     // Project matrix endpoint must not 500 either
     const matrix = await request.get(`/api/projects/${encodeURIComponent(proj)}`)

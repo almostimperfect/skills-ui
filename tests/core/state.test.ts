@@ -72,6 +72,18 @@ describe('enable', () => {
     const isDisabled = await mgr.isDisabled(projectDir, 'claude-code', 'tdd-workflow')
     expect(isDisabled).toBe(false)
   })
+
+  it('DEBT-002: rejects an uninstalled skill before mutating state or creating a symlink', async () => {
+    const mgr = createStateManager(statePath, projectDir)
+    const agentDirs = { 'claude-code': '.claude/skills' }
+
+    await expect(
+      mgr.enable(projectDir, 'claude-code', 'missing-skill', agentDirs)
+    ).rejects.toThrow('Skill not installed: missing-skill')
+
+    expect(await mgr.getDisabled(projectDir)).toEqual({})
+    expect(existsSync(join(projectDir, '.claude', 'skills', 'missing-skill'))).toBe(false)
+  })
 })
 
 describe('cleanupSkill', () => {

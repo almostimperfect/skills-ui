@@ -44,6 +44,8 @@ import { createApp } from '../../src/server/index.js'
 
 beforeEach(() => {
   vi.clearAllMocks()
+  mockStateManager.getDisabled.mockResolvedValue({})
+  mockStateManager.isDisabled.mockResolvedValue(false)
 })
 
 describe('GET /api/projects', () => {
@@ -101,13 +103,15 @@ describe('GET /api/projects/:projectPath', () => {
     ;(listSkills as ReturnType<typeof vi.fn>).mockResolvedValue([
       { name: 'tdd-workflow', description: '', source: '' },
     ])
-    mockStateManager.isDisabled.mockResolvedValue(false)
+    mockStateManager.getDisabled.mockResolvedValue({ 'claude-code': [] })
 
     const app = createApp()
     const encoded = encodeURIComponent('/home/user/proj')
     const res = await request(app).get(`/api/projects/${encoded}`)
     expect(res.status).toBe(200)
     expect(res.body.matrix['tdd-workflow']['claude-code']).toBe('enabled')
+    expect(mockStateManager.getDisabled).toHaveBeenCalledTimes(1)
+    expect(mockStateManager.isDisabled).not.toHaveBeenCalled()
   })
 
   it('returns 404 for unknown project', async () => {

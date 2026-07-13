@@ -12,6 +12,9 @@ export default function SkillDetail() {
   })
 
   if (isLoading) return <div className="p-8 text-gray-500">Loading...</div>
+  if (error instanceof Error && error.message.startsWith('404 ')) {
+    return <div className="p-8 text-red-600">Skill not found</div>
+  }
   if (error || !skill) return <div className="p-8 text-red-600">Failed to load skill</div>
 
   const projectPaths = Object.keys(skill.status)

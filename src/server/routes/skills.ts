@@ -6,6 +6,7 @@ import { createProjectRegistry } from '../../core/projects.js'
 import { CONFIG_PATH, STATE_PATH, AGENT_DIRS, CANONICAL_SKILLS_DIR, SUPPORTED_AGENTS } from '../../core/constants.js'
 import { join } from 'path'
 import { homedir } from 'os'
+import { access } from 'fs/promises'
 
 export function skillsRouter(): Router {
   const router = Router()
@@ -20,7 +21,7 @@ export function skillsRouter(): Router {
       const enriched = await Promise.all(
         skills.map(async s => {
           const meta = await parseSkillMetadata(join(globalSkillsDir, s.name), s.name)
-          return meta ?? s
+          return meta
         })
       )
       res.json(enriched)
@@ -38,14 +39,24 @@ export function skillsRouter(): Router {
       const { name } = req.params
       // Global skills are stored at ~/.agents/skills/ (installed with -g flag)
       const globalSkillsDir = join(homedir(), CANONICAL_SKILLS_DIR)
-      const skill = await parseSkillMetadata(join(globalSkillsDir, name), name)
+      const skillDir = join(globalSkillsDir, name)
+      try {
+        await access(skillDir)
+      } catch (err: unknown) {
+        if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
+          res.status(404).json({ error: 'Skill not found' })
+          return
+        }
+        throw err
+      }
+      const skill = await parseSkillMetadata(skillDir, name)
       const projects = await registry.listProjects()
       const status: Record<string, Record<string, 'enabled' | 'disabled'>> = {}
       for (const project of projects) {
+        const disabled = await state.getDisabled(project.path)
         status[project.path] = {}
         for (const agent of project.agents) {
-          const disabled = await state.isDisabled(project.path, agent, name)
-          status[project.path][agent] = disabled ? 'disabled' : 'enabled'
+          status[project.path][agent] = disabled[agent]?.includes(name) ? 'disabled' : 'enabled'
         }
       }
       res.json({ ...skill, status })
@@ -97,6 +108,15 @@ export function skillsRouter(): Router {
       return
     }
     try {
+      const project = await registry.getProject(projectPath)
+      if (!project) {
+        res.status(404).json({ error: 'Project not found' })
+        return
+      }
+      if (!project.agents.includes(agent)) {
+        res.status(400).json({ error: `agent ${agent} is not managed by this project` })
+        return
+      }
       await state.enable(projectPath, agent, req.params.name, AGENT_DIRS)
       res.json({ ok: true })
     } catch {
@@ -115,6 +135,15 @@ export function skillsRouter(): Router {
       return
     }
     try {
+      const project = await registry.getProject(projectPath)
+      if (!project) {
+        res.status(404).json({ error: 'Project not found' })
+        return
+      }
+      if (!project.agents.includes(agent)) {
+        res.status(400).json({ error: `agent ${agent} is not managed by this project` })
+        return
+      }
       await state.disable(projectPath, agent, req.params.name, AGENT_DIRS)
       res.json({ ok: true })
     } catch {

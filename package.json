@@ -14,7 +14,14 @@
     "dev:server": "node --import tsx/esm src/cli/index.ts serve",
     "dev:web": "vite",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:docker": "docker build -f Dockerfile.test -t skills-ui-test . && docker run --rm skills-ui-test",
+    "test:docker:shell": "docker build -f Dockerfile.test -t skills-ui-test . && docker run --rm -it skills-ui-test bash",
+    "test:e2e": "sh e2e/scripts/run-e2e.sh",
+    "test:e2e:network": "sh e2e/scripts/run-e2e.sh --network",
+    "test:e2e:report": "sh e2e/scripts/show-report.sh",
+    "serve:docker": "sh e2e/scripts/serve-docker.sh",
+    "serve:docker:demo": "sh e2e/scripts/serve-docker.sh --demo"
   },
   "dependencies": {
     "commander": "^12.1.0",
@@ -23,6 +30,7 @@
     "skills": "^1.4.5"
   },
   "devDependencies": {
+    "@playwright/test": "1.49.1",
     "@types/express": "^5.0.0",
     "@types/node": "^22.0.0",
     "@types/react": "^19.0.0",

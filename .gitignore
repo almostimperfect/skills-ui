@@ -4,6 +4,10 @@ node_modules/
 # Build output
 dist/
 
+# E2E artifacts (sole `docker cp` destination — local only; CI publishes via its
+# own artifact mechanism). Per-worker HOMEs exist only inside the container.
+e2e/output/
+
 # TypeScript incremental build info
 *.tsbuildinfo
 

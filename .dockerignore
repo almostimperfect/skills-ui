@@ -1,0 +1,44 @@
+# Keep the build context small and never copy host-generated artifacts.
+
+# Dependencies & build output (deps are installed fresh via `npm ci` in-image)
+node_modules
+dist
+coverage
+.vite
+*.tsbuildinfo
+*.js.map
+
+# Git metadata (tests don't need it)
+.git
+.gitignore
+
+# Local AI-tooling / editor configs — includes the .claude & .codex skill symlinks
+.claude
+.codex
+.antigravity
+.gemini
+.superpowers
+.cursor
+.aider*
+.continue
+.agent
+.agents
+.worktrees
+
+# Docker's own files
+Dockerfile.test
+Dockerfile.e2e
+.dockerignore
+
+# Secrets / local environment — must NEVER enter a build context (hard rule 5)
+.env*
+*.pem
+*.key
+
+# E2E artifacts (extracted via docker cp; never re-enter the image)
+e2e/output
+
+# OS noise, logs, and skills-ui lockfile
+.DS_Store
+*.log
+skills-lock.json

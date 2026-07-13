@@ -1,0 +1,4 @@
+interface:
+  display_name: "Dev Chronicle"
+  short_description: "Record skills-ui milestones as project history"
+  default_prompt: "Use $dev-chronicle to record this skills-ui milestone as a versioned chronicle entry under .DEVELOPMENT/chronicle/entries/ with evidence links (commits, logs, issues) and story material, following the Entry Structure in the skill."

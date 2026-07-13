@@ -40,6 +40,32 @@ describe('listSkills', () => {
     const skills = await listSkills()
     expect(skills.map(s => s.name)).toEqual(['tdd-workflow', 'react-best-practices'])
   })
+
+  // BUG-001 regression: skills >=1.4.x output — hardcoded ANSI, header, path suffix,
+  // Agents detail lines, and a changed empty-store message.
+  const ESC = '\u001b'
+
+  it('BUG-001: parses the skills@1.4.x ANSI format into clean names', async () => {
+    mockSuccess(
+      `${ESC}[1mGlobal Skills${ESC}[0m\n` +
+        `\n` +
+        `${ESC}[36mtdd-workflow${ESC}[0m ${ESC}[38;5;102m~/.agents/skills/tdd-workflow${ESC}[0m\n` +
+        `  ${ESC}[38;5;102mAgents:${ESC}[0m ${ESC}[33mnot linked${ESC}[0m\n` +
+        `${ESC}[36mspaced skill${ESC}[0m ${ESC}[38;5;102m~/.agents/skills/spaced skill${ESC}[0m\n` +
+        `  ${ESC}[38;5;102mAgents:${ESC}[0m ${ESC}[33mclaude-code${ESC}[0m\n`
+    )
+    const skills = await listSkills()
+    expect(skills.map(s => s.name)).toEqual(['tdd-workflow', 'spaced skill'])
+  })
+
+  it('BUG-001: skills@1.4.x empty-store message parses as empty, not phantom skills', async () => {
+    mockSuccess(
+      `${ESC}[38;5;102mNo global skills found.${ESC}[0m\n` +
+        `${ESC}[38;5;102mTry listing project skills without -g${ESC}[0m\n`
+    )
+    const skills = await listSkills()
+    expect(skills).toEqual([])
+  })
 })
 
 describe('addSkill', () => {

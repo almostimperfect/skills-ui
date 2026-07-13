@@ -47,6 +47,10 @@ beforeEach(() => {
   mockRemove.mockReset()
   mockRegistryInstance.listProjects.mockResolvedValue([])
   mockStateInstance.isDisabled.mockResolvedValue(false)
+  mockStateInstance.enable.mockClear()
+  mockStateInstance.enable.mockResolvedValue(undefined)
+  mockStateInstance.disable.mockClear()
+  mockStateInstance.disable.mockResolvedValue(undefined)
 })
 
 describe('GET /api/skills', () => {
@@ -102,5 +106,55 @@ describe('DELETE /api/skills/:name', () => {
     const res = await request(app).delete('/api/skills/tdd-workflow')
     expect(res.status).toBe(204)
     expect(mockRemove).toHaveBeenCalledWith('tdd-workflow')
+  })
+})
+
+describe.each(['enable', 'disable'] as const)('POST /api/skills/:name/%s', op => {
+  it(`calls state.${op} with project, agent, and skill name`, async () => {
+    const app = createApp()
+    const res = await request(app)
+      .post(`/api/skills/tdd-workflow/${op}`)
+      .send({ projectPath: '/home/user/proj', agent: 'claude-code' })
+    expect(res.status).toBe(200)
+    expect(res.body).toEqual({ ok: true })
+    expect(mockStateInstance[op]).toHaveBeenCalledWith(
+      '/home/user/proj',
+      'claude-code',
+      'tdd-workflow',
+      expect.any(Object)
+    )
+  })
+
+  it('returns 400 when projectPath or agent is missing', async () => {
+    const app = createApp()
+    const noAgent = await request(app)
+      .post(`/api/skills/tdd-workflow/${op}`)
+      .send({ projectPath: '/home/user/proj' })
+    expect(noAgent.status).toBe(400)
+
+    const noProject = await request(app)
+      .post(`/api/skills/tdd-workflow/${op}`)
+      .send({ agent: 'claude-code' })
+    expect(noProject.status).toBe(400)
+    expect(mockStateInstance[op]).not.toHaveBeenCalled()
+  })
+
+  it('returns 400 listing valid agents when agent is not whitelisted', async () => {
+    const app = createApp()
+    const res = await request(app)
+      .post(`/api/skills/tdd-workflow/${op}`)
+      .send({ projectPath: '/home/user/proj', agent: 'not-an-agent' })
+    expect(res.status).toBe(400)
+    expect(res.body.error).toContain('claude-code')
+    expect(mockStateInstance[op]).not.toHaveBeenCalled()
+  })
+
+  it(`returns 500 when state.${op} throws`, async () => {
+    mockStateInstance[op].mockRejectedValueOnce(new Error('disk full'))
+    const app = createApp()
+    const res = await request(app)
+      .post(`/api/skills/tdd-workflow/${op}`)
+      .send({ projectPath: '/home/user/proj', agent: 'claude-code' })
+    expect(res.status).toBe(500)
   })
 })

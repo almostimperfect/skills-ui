@@ -45,14 +45,28 @@ async function runSkills(args: string[], timeout = DEFAULT_TIMEOUT): Promise<str
   })
 }
 
+// The skills CLI hardcodes ANSI colors even when piped (NO_COLOR is ignored).
+const ANSI_RE = /\u001b\[[0-9;?]*[A-Za-z]/g
+
 export async function listSkills(): Promise<Skill[]> {
   // -g = global skills store (~/.agents/skills/)
   const stdout = await runSkills(['list', '-g'])
-  const lines = stdout
-    .split('\n')
-    .map(l => l.trim())
-    .filter(l => l.length > 0 && !l.toLowerCase().includes('no skills'))
-  return lines.map(name => ({ name, description: '', source: '' }))
+  const skills: Skill[] = []
+  for (const raw of stdout.split('\n')) {
+    const line = raw.replace(ANSI_RE, '').trim()
+    if (line.length === 0) continue
+    // Decoration and empty-store lines from skills >=1.4.x, plus the legacy empty message
+    if (/^global skills$/i.test(line)) continue
+    if (line.startsWith('Agents:')) continue
+    if (/^no (global )?skills/i.test(line)) continue // "No global skills found." / "No skills installed."
+    if (line.startsWith('Try listing')) continue
+    // skills >=1.4.x format: "<name> ~/.agents/skills/<name>" — split on the path suffix
+    // so names containing spaces survive. Legacy format (plain name per line) has no
+    // suffix and falls through to the whole line.
+    const name = line.split(/\s+~\//)[0].trim()
+    if (name) skills.push({ name, description: '', source: '' })
+  }
+  return skills
 }
 
 export async function addSkill(source: string): Promise<void> {

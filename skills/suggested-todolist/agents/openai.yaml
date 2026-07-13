@@ -1,0 +1,4 @@
+interface:
+  display_name: "Suggested Todolist"
+  short_description: "Prioritize skills-ui feature, testing, and performance work"
+  default_prompt: "Use $suggested-todolist only when explicitly asked to refresh, inspect, or revise skills-ui backlog/todolist/issue-registry work. Refresh .DEVELOPMENT/TODOLIST.md from the root DEVELOPMENT.md, README.md, and the current implementation state with prioritized feature, performance, and testing tasks, and reconcile defects/tech-debt into .DEVELOPMENT/ISSUES.md. Do not automatically hand off to $dev-session-summary or execute newly added tasks unless explicitly requested."

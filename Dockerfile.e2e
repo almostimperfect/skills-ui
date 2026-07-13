@@ -1,0 +1,27 @@
+# E2E test environment for skills-ui — functional + UI automation (Chromium).
+#
+# HARD ISOLATION CONTRACT (see e2e/README.md and DEVELOPMENT.md):
+#   * The host needs Docker only — never Node, never npm.
+#   * Build is COPY-only; `docker run` for this image must use ZERO -v/--mount flags.
+#   * node_modules, dist, Playwright browsers and caches all live in image layers.
+#   * Test artifacts leave the container only via `docker cp` (to e2e/output/) or a port.
+#
+# Base image ships Node 20 + Chromium + every OS dep for Playwright 1.49.1 —
+# the tag MUST match the @playwright/test version pinned in package.json.
+FROM mcr.microsoft.com/playwright:v1.49.1-jammy
+
+WORKDIR /app
+
+# Dependency layer (cached until package*.json changes). Never re-run on the host.
+COPY package.json package-lock.json ./
+RUN npm ci
+
+# Source + build (server TS → dist/, web SPA → dist/web/)
+COPY . .
+RUN npm run build
+
+ENV CI=1
+
+# Default command only — scripts pass the exact test command at `docker run` time
+# (offline tier vs -e E2E_NETWORK=1 tier), so behavior never depends on CMD.
+CMD ["npx", "playwright", "test", "--config", "e2e/playwright.config.ts"]

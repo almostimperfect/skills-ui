@@ -1,0 +1,4 @@
+interface:
+  display_name: "Dev Session Summary"
+  short_description: "Review skills-ui drift and sync docs when requested"
+  default_prompt: "Use $dev-session-summary only when explicitly asked for a skills-ui development summary, log, doc sync, or project-doc review. Write a timestamped .DEVELOPMENT/log/log-YYYY-MM-DD-HHMMSS.md file, update the stale root DEVELOPMENT.md and README.md if project reality changed, and review for drift against the project's design decisions (state-first ordering, atomic writes, bundled skills binary, agent whitelist, path validation). Do not run $suggested-todolist or complete .DEVELOPMENT/TODOLIST.md items unless explicitly requested."

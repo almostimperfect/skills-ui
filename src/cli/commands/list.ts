@@ -1,8 +1,11 @@
 import { Command } from 'commander'
+import { homedir } from 'os'
+import { join } from 'path'
 import { listSkills, SkillsCliError } from '../../core/skills-cli.js'
+import { parseSkillMetadata } from '../../core/metadata.js'
 import { createStateManager } from '../../core/state.js'
 import { createProjectRegistry } from '../../core/projects.js'
-import { STATE_PATH, CONFIG_PATH } from '../../core/constants.js'
+import { STATE_PATH, CONFIG_PATH, CANONICAL_SKILLS_DIR } from '../../core/constants.js'
 
 export function listCommand(): Command {
   return new Command('list')
@@ -31,8 +34,10 @@ export function listCommand(): Command {
             console.log(row.join('  |  '))
           }
         } else {
+          const globalSkillsDir = join(homedir(), CANONICAL_SKILLS_DIR)
           for (const skill of skills) {
-            console.log(`  ${skill.name}${skill.description ? '  —  ' + skill.description : ''}`)
+            const meta = await parseSkillMetadata(join(globalSkillsDir, skill.name), skill.name)
+            console.log(`  ${skill.name}${meta.description ? '  —  ' + meta.description : ''}`)
           }
         }
       } catch (err) {

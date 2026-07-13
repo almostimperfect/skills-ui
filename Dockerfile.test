@@ -1,0 +1,29 @@
+# Isolated test environment for skills-ui.
+#
+# Everything the code touches at runtime — ~/.skills-ui/{config,state}.json,
+# the global ~/.agents/skills store, and the bundled `skills` binary — stays
+# INSIDE this container and is discarded when it exits. The host machine's home
+# directory is never mounted, so a test (or a careless code path) cannot write
+# to your real skills-ui state or skill store.
+#
+# Usage:
+#   docker build -f Dockerfile.test -t skills-ui-test .
+#   docker run --rm skills-ui-test            # run the Vitest suite once
+#   docker run --rm -it skills-ui-test bash   # interactive shell for debugging
+#
+# Or via npm:  npm run test:docker
+
+FROM node:20-slim
+
+WORKDIR /app
+
+# Install dependencies from the lockfile — clean, reproducible, container-only.
+# The host never needs its own node_modules.
+COPY package.json package-lock.json ./
+RUN npm ci
+
+# Copy the rest of the source (see .dockerignore for what is excluded).
+COPY . .
+
+# Default: run the test suite once and exit.
+CMD ["npm", "test"]

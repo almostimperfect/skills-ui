@@ -33,8 +33,6 @@ test.describe('Dashboard & navigation', () => {
     // Simulate backend failure for the skills query.
     await page.route('**/api/skills', route => route.fulfill({ status: 503, body: '{"error":"down"}' }))
     await page.goto('/')
-    // DESIRED: something visibly distinct from the loading "—".
-    // ACTUAL today: Dashboard renders "—" for loading AND error identically.
     await expect(page.getByText(/error|failed|unavailable/i)).toBeVisible()
   })
 

@@ -1,6 +1,6 @@
 /**
  * CLI functional E2E: enable / disable + on-disk symlink truth.
- * Known-broken desired behaviors are test.fixme, titled with their registry IDs.
+ * Resolved registry findings remain active as validation regressions.
  */
 import { test, expect } from '../../helpers/env.js'
 import { runCli } from '../../helpers/cli.js'
@@ -60,12 +60,11 @@ test.describe('CLI: enable/disable happy path', () => {
   })
 })
 
-test.describe('CLI: enable/disable validation gaps (registered findings)', () => {
+test.describe('CLI: enable/disable validation regressions', () => {
   test('DEBT-001/F-CLI-02: enable with unknown --agent must be rejected, not ✓', async ({ server }) => {
     await seedSkill(server.home, 'basic-skill')
     const proj = await makeProject(server.home, 'proj-d', { agentDirs: ['.claude'] })
     const res = await runCli(server.home, ['enable', 'basic-skill', '--project', proj, '--agent', 'nonsense'])
-    // DESIRED: exit 1 + clear message. ACTUAL today: exit 0 + "✓ Enabled ... for nonsense".
     expect(res.code).toBe(1)
     expect(res.stderr).toMatch(/agent/i)
   })
@@ -73,21 +72,17 @@ test.describe('CLI: enable/disable validation gaps (registered findings)', () =>
   test('DEBT-001/F-CLI-02: enable for an unregistered project must be rejected', async ({ server }) => {
     await seedSkill(server.home, 'basic-skill')
     const res = await runCli(server.home, ['enable', 'basic-skill', '--project', '/not/registered', '--agent', 'claude-code'])
-    // DESIRED: exit 1. ACTUAL today: exit 0, state written for an unknown project.
     expect(res.code).toBe(1)
   })
 
   test('DEBT-002/F-CLI-03: enabling an uninstalled skill must not create a dangling symlink', async ({ server }) => {
     const proj = await makeProject(server.home, 'proj-e', { agentDirs: ['.claude'] })
     const res = await runCli(server.home, ['enable', 'ghost-skill', '--project', proj, '--agent', 'claude-code'])
-    // DESIRED: rejected. ACTUAL today: exit 0 and a dangling link at .claude/skills/ghost-skill.
     expect(res.code).toBe(1)
     expect(await isSymlink(agentLinkPath(proj, 'claude-code', 'ghost-skill'))).toBe(false)
   })
 
-  test('SCEN-DANGLING-01: current behavior — dangling link is created (pins DEBT-002 reality)', async ({ server }) => {
-    // This is the TRUTH-PINNING twin of the fixme above: it asserts today's actual
-    // behavior so a silent change is noticed. Delete it when DEBT-002 is fixed.
+  test('SCEN-DANGLING-01: listing remains safe after a canonical skill is removed externally', async ({ server }) => {
     const proj = await makeProject(server.home, 'proj-f', { agentDirs: ['.claude'] })
     await seedSkill(server.home, 'basic-skill')
     await runCli(server.home, ['enable', 'basic-skill', '--project', proj, '--agent', 'claude-code'])

@@ -41,7 +41,6 @@ test.describe('Skill Detail', () => {
 
   test('UX-001/F-WEB-06: unknown skill must show a not-found state, not a placeholder page', async ({ page }) => {
     await page.goto('/skills/does-not-exist')
-    // DESIRED: explicit not-found. ACTUAL today: 200 placeholder renders as if it exists.
     await expect(page.getByText(/not found/i)).toBeVisible()
   })
 

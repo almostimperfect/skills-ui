@@ -45,8 +45,6 @@ test.describe('CLI: project add', () => {
 
   test('UX-003/F-CLI-01: registering a NONEXISTENT path must fail, not print ✓', async ({ server }) => {
     const res = await runCli(server.home, ['project', 'add', '/definitely/not/here'])
-    // DESIRED: exit 1 + "does not exist" (parity with POST /api/projects).
-    // ACTUAL today: resolve()d and registered with "✓ Registered".
     expect(res.code).toBe(1)
     expect(res.stderr).toMatch(/exist/i)
   })

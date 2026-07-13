@@ -56,13 +56,17 @@ Hard isolation rules (binding; full list in `e2e/README.md`): zero `-v`/`--mount
 `e2e/output/` after exit; unique `$HOME` per Playwright worker; network tier fetches skill sources
 only — dependency installation happens exclusively at image build time.
 
+The current offline acceptance baseline is **71 passed, 0 skipped, 0 failed** (2026-07-13). Its
+current interaction contract is documented in
+[`docs/testing/functional-interaction-test-design-v1.1.md`](docs/testing/functional-interaction-test-design-v1.1.md).
+
 ## Stack
 
 | Layer    | Technology |
 |----------|-----------|
 | Backend  | Node.js 18, TypeScript (ESM), Express 4 |
 | Frontend | React 19, Vite 6, Tailwind CSS 3, TanStack Query 5, React Router 7 |
-| Testing  | Vitest 2 + Supertest |
+| Testing  | Vitest 2 + Supertest + Playwright 1.49 (Docker) |
 
 ## Project Structure
 
@@ -93,6 +97,13 @@ tests/
 
 **Bundled `skills` binary** — The `skills` package is a regular `dependency`, so `node_modules/.bin/skills` is always available after `npm install`. Routes and CLI always call it directly; `npx skills` is never used (it may resolve a different version from PATH).
 
-**Agent whitelist** — Valid agent IDs are defined once in `SUPPORTED_AGENTS` (`constants.ts`). API routes validate `agent` against this list and return 400 for unknown values.
+**Agent and project validation** — Valid agent IDs are defined once in `SUPPORTED_AGENTS`
+(`constants.ts`). Enable/disable operations on both CLI and API require a registered project, a
+supported agent managed by that project, and an installed canonical skill.
 
-**Path validation** — `POST /api/projects` rejects relative paths and paths that don't exist on disk before handing off to the registry.
+**Path validation** — CLI `project add` and `POST /api/projects` reject relative paths, missing paths,
+and non-directory paths before handing off to the registry.
+
+**Actionable Web errors** — `src/web/api.ts` converts failed responses into typed `ApiError` values
+while preserving human-readable server messages. Mutations surface errors in visible alerts;
+destructive list actions require confirmation, and bulk actions report partial-failure counts.

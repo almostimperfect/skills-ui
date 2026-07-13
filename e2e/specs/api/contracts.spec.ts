@@ -84,7 +84,6 @@ test.describe('POST /api/skills/:name/enable|disable — validation contract', (
     const res = await request.post('/api/skills/basic-skill/enable', {
       data: { projectPath: '/not/registered', agent: 'claude-code' },
     })
-    // DESIRED: 404/400. ACTUAL today: 200 {ok:true}, state written for unknown project.
     expect([400, 404]).toContain(res.status())
   })
 })

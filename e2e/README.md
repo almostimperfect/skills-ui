@@ -1,6 +1,6 @@
 # skills-ui E2E — Dockerized functional & UI automation
 
-Automated implementation of [docs/testing/functional-interaction-test-design.md](../docs/testing/functional-interaction-test-design.md):
+Automated implementation of [functional-interaction-test-design v1.1](../docs/testing/functional-interaction-test-design-v1.1.md):
 CLI functional tests, API contract tests, and Chromium UI automation — **everything runs inside
 Docker**. The host machine needs **Docker only**: no Node, no npm, no browsers, ever.
 
@@ -71,23 +71,19 @@ e2e/
 
 - **Spec titles carry the case IDs** from the test-design document (`CLI-ADD-01`, `WEB-PROJ-03`, …)
   plus scenario IDs (`SCEN-…`, `NET-…`) added by the automation pass.
-- **Registered findings are `test.fixme`** titled with their registry ID (`BUG-001`, `UX-003`,
-  `DEBT-001`, …): they assert the *desired* behavior and are skipped-but-listed, so the suite stays
-  green while precisely documenting each gap. When a bug is fixed, its fixme flips to a real test.
-- **Truth-pins** (titled `… pin:`) assert today's *broken* behavior so silent changes get noticed.
-  Delete a pin when its finding is fixed.
+- **Registered findings become active desired-behavior tests when fixed.** The 2026-07-13 offline
+  baseline has 71 passing tests and no skipped registered findings.
+- Historical truth-pins are removed or renamed when a finding is fixed; remaining scenario tests
+  describe supported resilience behavior rather than preserving a known defect.
 - **Seeding boundary:** direct store seeding validates skills-ui's runtime state handling only;
   installer behavior always goes through a real `skills add` (local fixture repos offline; real
   sources in `@network`).
 
-## Known product gaps the suite documents
+## Current product gaps
 
-- **BUG-001** (high): `listSkills()` cannot parse the bundled `skills@1.4.5` output (hardcoded ANSI,
-  header/agents lines, changed empty-store message) — the list/CLI/matrix layers see garbage names,
-  and an empty store parses as 2 phantom skills. Confirmed by in-container probes; pinned by
-  `api/contracts.spec.ts`.
-- `skills-ui add` cannot pass `--skill` through to the bundled binary, so selecting one skill from a
-  multi-skill repo (e.g. `anthropics/skills --skill pptx`) is impossible through skills-ui — the
-  `@network` specs drive the bundled binary directly for those cases.
-- The 12 UX findings from the manual test design (`UX-003`…`UX-010`, `DEBT-001/002`, `UX-001/002`)
-  each appear as a fixme and/or pin. Full register: `.DEVELOPMENT/ISSUES.md`.
+- CLI has no project-unregister command (UX-012).
+- Project rename and managed-agent editing have an API but no Web controls (UX-013).
+- `skills-ui add` cannot yet pass `--skill` through for one skill in a multi-skill source (UX-014).
+
+The 15 issues that were open or scheduled at the start of the 2026-07-13 pass, plus the earlier
+BUG-001 parser fix, are retained as resolved history in `.DEVELOPMENT/ISSUES.md`.

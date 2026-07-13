@@ -89,8 +89,6 @@ test.describe('CLI: remove a skill', () => {
   })
 
   test('UX-011: removing a nonexistent skill must error (exit 1), not report ✓ (CLI-REMOVE-02)', async ({ server }) => {
-    // DESIRED: exit 1 + clear error. ACTUAL today: the bundled binary prints
-    // "No skills found to remove." but exits 0, and skills-ui blindly prints "✓ Removed".
     const res = await runCli(server.home, ['remove', 'ghost-skill'])
     expect(res.code).toBe(1)
     expect(res.stderr).toContain('Error:')

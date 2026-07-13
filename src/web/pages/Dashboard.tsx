@@ -9,6 +9,9 @@ export default function Dashboard() {
   return (
     <div className="p-8">
       <h1 className="text-2xl font-bold text-gray-900 mb-6">Dashboard</h1>
+      {(skills.error || projects.error) && (
+        <p role="alert" className="text-red-600 mb-4">Dashboard data unavailable</p>
+      )}
       <div className="grid grid-cols-2 gap-4 mb-8">
         <div className="bg-white rounded-lg border border-gray-200 p-6">
           <p className="text-3xl font-bold text-indigo-600">

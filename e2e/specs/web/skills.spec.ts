@@ -20,7 +20,7 @@ test.describe('Skills list & search', () => {
     await expect(page.getByText('A well-formed fixture skill')).toBeVisible()
   })
 
-  test('UX-004/F-WEB-01 pin: Remove fires the DELETE immediately — no confirmation', async ({ page, server }) => {
+  test('UX-004/F-WEB-01: Remove asks for confirmation before DELETE', async ({ page, server }) => {
     await seedSkill(server.home, 'basic-skill')
     await page.goto('/skills')
     const firstRemove = page.getByRole('button', { name: 'Remove' }).first()
@@ -31,17 +31,20 @@ test.describe('Skills list & search', () => {
       if (req.method() === 'DELETE' && req.url().includes('/api/skills/')) deleteFired = true
     })
     let dialogShown = false
-    page.on('dialog', () => {
+    page.once('dialog', async dialog => {
       dialogShown = true
+      expect(dialog.type()).toBe('confirm')
+      expect(deleteFired, 'DELETE must wait for confirmation').toBe(false)
+      await dialog.accept()
     })
 
     await firstRemove.click()
-    await page.waitForTimeout(500)
-    expect(deleteFired, 'DELETE fired straight from the click').toBe(true)
-    expect(dialogShown, 'no native confirm() either').toBe(false)
+    await expect(page.getByRole('link', { name: 'basic-skill', exact: true })).toBeHidden()
+    expect(dialogShown).toBe(true)
+    expect(deleteFired).toBe(true)
   })
 
-  test.fixme('UX-005/F-WEB-02: failed remove must surface a visible error', async ({ page, server }) => {
+  test('UX-005/F-WEB-02: failed remove must surface a visible error', async ({ page, server }) => {
     await seedSkill(server.home, 'basic-skill')
     await page.route('**/api/skills/**', route =>
       route.request().method() === 'DELETE'
@@ -49,9 +52,9 @@ test.describe('Skills list & search', () => {
         : route.continue()
     )
     await page.goto('/skills')
+    page.once('dialog', dialog => dialog.accept())
     await page.getByRole('button', { name: 'Remove' }).first().click()
-    // DESIRED: visible failure feedback. ACTUAL today: no onError → silence.
-    await expect(page.getByText(/fail|error|cannot/i)).toBeVisible()
+    await expect(page.getByRole('alert')).toContainText(/cannot remove/i)
   })
 })
 
@@ -70,27 +73,16 @@ test.describe('Add Skill dialog', () => {
     await expect(page.getByRole('heading', { name: 'Add Skill' })).toBeHidden({ timeout: 120_000 })
   })
 
-  test('WEB-ADD-02 pin: install error surfaces (currently as raw HTTP text — UX-006)', async ({ page }) => {
+  test('WEB-ADD-02: install error surfaces as a human-readable message', async ({ page }) => {
     await page.goto('/skills')
     await page.getByRole('button', { name: 'Add Skill' }).click()
     await page.getByPlaceholder('owner/repo, GitHub URL, or local path').fill('/definitely/not/a/repo')
     await page.getByRole('button', { name: 'Install' }).click()
 
     // SOMETHING is shown (this dialog is the one place with error wiring)…
-    const err = page.locator('p.text-red-600')
+    const err = page.getByRole('alert')
     await expect(err).toBeVisible({ timeout: 120_000 })
-    // …pin of UX-006: today it's the raw "<status> <statusText>: <body>" string.
-    await expect(err).toContainText('422')
-  })
-
-  test.fixme('UX-006/F-WEB-03: install error must be human-readable, not raw HTTP status text', async ({ page }) => {
-    await page.goto('/skills')
-    await page.getByRole('button', { name: 'Add Skill' }).click()
-    await page.getByPlaceholder('owner/repo, GitHub URL, or local path').fill('/definitely/not/a/repo')
-    await page.getByRole('button', { name: 'Install' }).click()
-    const err = page.locator('p.text-red-600')
-    await expect(err).toBeVisible({ timeout: 120_000 })
-    await expect(err).not.toContainText('422') // no status codes in user-facing text
+    await expect(err).not.toContainText('422')
   })
 
   test('WEB-ADD-01b: Install button disabled while source empty', async ({ page }) => {
@@ -99,12 +91,25 @@ test.describe('Add Skill dialog', () => {
     await expect(page.getByRole('button', { name: 'Install' })).toBeDisabled()
   })
 
-  test.fixme('UX-007/F-WEB-04: dialog must support Enter-submit, Esc-cancel, autofocus', async ({ page }) => {
+  test('UX-007/F-WEB-04: dialog supports Esc-cancel and autofocus', async ({ page }) => {
     await page.goto('/skills')
     await page.getByRole('button', { name: 'Add Skill' }).click()
     const input = page.getByPlaceholder('owner/repo, GitHub URL, or local path')
     await expect(input).toBeFocused() // autofocus
     await page.keyboard.press('Escape') // Esc closes
+    await expect(page.getByRole('heading', { name: 'Add Skill' })).toBeHidden()
+  })
+
+  test('UX-007/F-WEB-04: dialog supports Enter-submit', async ({ page }) => {
+    await page.route('**/api/skills', route =>
+      route.request().method() === 'POST'
+        ? route.fulfill({ status: 201, contentType: 'application/json', body: '{"ok":true}' })
+        : route.continue()
+    )
+    await page.goto('/skills')
+    await page.getByRole('button', { name: 'Add Skill' }).click()
+    await page.getByPlaceholder('owner/repo, GitHub URL, or local path').fill('owner/repo')
+    await page.keyboard.press('Enter')
     await expect(page.getByRole('heading', { name: 'Add Skill' })).toBeHidden()
   })
 })

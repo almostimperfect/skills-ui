@@ -14,6 +14,12 @@ export default function Skills() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['skills'] }),
   })
 
+  const remove = (name: string) => {
+    if (!window.confirm(`Remove skill "${name}"?`)) return
+    removeMutation.reset()
+    removeMutation.mutate(name)
+  }
+
   const filtered = skills?.filter(s =>
     s.name.toLowerCase().includes(search.toLowerCase()) ||
     s.description.toLowerCase().includes(search.toLowerCase())
@@ -41,6 +47,11 @@ export default function Skills() {
 
       {isLoading && <p className="text-gray-500">Loading...</p>}
       {error && <p className="text-red-600">Failed to load skills</p>}
+      {removeMutation.error && (
+        <p role="alert" className="text-red-600 text-sm mb-4">
+          Failed to remove skill: {(removeMutation.error as Error).message}
+        </p>
+      )}
 
       <div className="bg-white rounded-lg border border-gray-200 divide-y divide-gray-100">
         {filtered?.map(skill => (
@@ -57,7 +68,7 @@ export default function Skills() {
               )}
             </div>
             <button
-              onClick={() => removeMutation.mutate(skill.name)}
+              onClick={() => remove(skill.name)}
               className="text-sm text-red-600 hover:text-red-800"
             >
               Remove

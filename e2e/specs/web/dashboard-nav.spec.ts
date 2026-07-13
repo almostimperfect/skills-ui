@@ -29,7 +29,7 @@ test.describe('Dashboard & navigation', () => {
     await expect(skillsCard.first()).toBeVisible()
   })
 
-  test.fixme('UX-008/F-WEB-05: API failure must render a distinct error state, not the loading dash', async ({ page }) => {
+  test('UX-008/F-WEB-05: API failure must render a distinct error state, not the loading dash', async ({ page }) => {
     // Simulate backend failure for the skills query.
     await page.route('**/api/skills', route => route.fulfill({ status: 503, body: '{"error":"down"}' }))
     await page.goto('/')

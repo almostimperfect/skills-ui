@@ -25,29 +25,18 @@ test.describe('Projects list', () => {
     await expect(page.getByText('claude-code')).toBeVisible() // auto-detected agent shown
   })
 
-  test('UX-005/F-WEB-02 pin: invalid path fails silently — form stays open, no message', async ({ page }) => {
+  test('UX-005/F-WEB-02: invalid path surfaces the server validation message', async ({ page }) => {
     await page.goto('/projects')
     await page.getByRole('button', { name: 'Add Project' }).click()
     const input = page.getByPlaceholder('/absolute/path/to/project')
     await input.fill('./relative/path')
     await page.getByRole('button', { name: 'Add', exact: true }).click()
-    await page.waitForTimeout(600)
-
-    // Truth-pin of today's behavior: 400 from the server, nothing surfaced.
-    await expect(input).toBeVisible() // form still open
+    await expect(input).toBeVisible()
     await expect(input).toHaveValue('./relative/path')
-    await expect(page.locator('.text-red-600')).toHaveCount(0) // no error shown anywhere
+    await expect(page.getByRole('alert')).toContainText(/absolute|exist/i)
   })
 
-  test.fixme('UX-005/F-WEB-02: invalid path must surface the server validation message', async ({ page }) => {
-    await page.goto('/projects')
-    await page.getByRole('button', { name: 'Add Project' }).click()
-    await page.getByPlaceholder('/absolute/path/to/project').fill('./relative/path')
-    await page.getByRole('button', { name: 'Add', exact: true }).click()
-    await expect(page.getByText(/absolute|exist/i)).toBeVisible()
-  })
-
-  test('UX-004/F-WEB-01 pin: project Remove is one-click, no confirmation', async ({ page, server }) => {
+  test('UX-004/F-WEB-01: project Remove asks for confirmation', async ({ page, server }) => {
     await makeProject(server.home, 'rm-proj', { agentDirs: ['.claude'] })
     await page.goto('/projects')
 
@@ -56,14 +45,32 @@ test.describe('Projects list', () => {
       if (req.method() === 'DELETE' && req.url().includes('/api/projects/')) deleteFired = true
     })
     let dialogShown = false
-    page.on('dialog', () => {
+    page.once('dialog', async dialog => {
       dialogShown = true
+      expect(dialog.type()).toBe('confirm')
+      expect(deleteFired).toBe(false)
+      await dialog.accept()
     })
 
     await page.getByRole('button', { name: 'Remove' }).first().click()
     await expect(page.getByText('No projects registered')).toBeVisible()
+    expect(dialogShown).toBe(true)
     expect(deleteFired).toBe(true)
-    expect(dialogShown).toBe(false)
+  })
+
+  test('UX-007/F-WEB-04: project form supports autofocus, Escape and Enter', async ({ page, server }) => {
+    const dir = join(server.home, 'projects', 'keyboard-added')
+    await mkdir(dir, { recursive: true })
+    await page.goto('/projects')
+    await page.getByRole('button', { name: 'Add Project' }).click()
+    const input = page.getByPlaceholder('/absolute/path/to/project')
+    await expect(input).toBeFocused()
+    await page.keyboard.press('Escape')
+    await expect(input).toBeHidden()
+    await page.getByRole('button', { name: 'Add Project' }).click()
+    await page.getByPlaceholder('/absolute/path/to/project').fill(dir)
+    await page.keyboard.press('Enter')
+    await expect(page.getByRole('link', { name: 'keyboard-added' })).toBeVisible()
   })
 })
 
@@ -113,12 +120,12 @@ test.describe('Project Detail', () => {
     await expect(page.getByText(/fail|error/i)).toBeVisible()
   })
 
-  test.fixme('UX-009/F-WEB-07: a failed toggle must surface an error, not silently revert', async ({ page, server }) => {
+  test('UX-009/F-WEB-07: a failed toggle must surface an error, not silently revert', async ({ page, server }) => {
     await seedSkill(server.home, 'basic-skill')
     const dir = await makeProject(server.home, 'errtoggle-p', { agentDirs: ['.claude'] })
     await page.route('**/api/skills/**/disable', route => route.fulfill({ status: 500, body: '{"error":"x"}' }))
     await page.goto(`/projects/${encodeURIComponent(dir)}`)
     await page.getByTitle('Disable for claude-code').first().click()
-    await expect(page.getByText(/fail|error/i)).toBeVisible()
+    await expect(page.getByRole('alert')).toContainText(/fail|error/i)
   })
 })

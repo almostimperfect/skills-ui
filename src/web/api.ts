@@ -1,10 +1,32 @@
 const BASE = '/api'
 
-async function json<T>(res: Response): Promise<T> {
-  if (!res.ok) {
-    const body = await res.text()
-    throw new Error(`${res.status} ${res.statusText}: ${body}`)
+export class ApiError extends Error {
+  constructor(public readonly status: number, message: string) {
+    super(message)
+    this.name = 'ApiError'
   }
+}
+
+async function errorMessage(res: Response): Promise<string> {
+  const body = await res.text()
+  if (body) {
+    try {
+      const parsed = JSON.parse(body) as { error?: unknown }
+      if (typeof parsed.error === 'string' && parsed.error.trim()) return parsed.error
+    } catch {
+      // Non-JSON responses fall back to their plain text below.
+    }
+    if (body.trim()) return body.trim()
+  }
+  return res.statusText || 'Request failed'
+}
+
+async function expectOk(res: Response): Promise<void> {
+  if (!res.ok) throw new ApiError(res.status, await errorMessage(res))
+}
+
+async function json<T>(res: Response): Promise<T> {
+  await expectOk(res)
   return res.json() as Promise<T>
 }
 
@@ -43,9 +65,7 @@ export const addSkill = (source: string) =>
   }).then(r => json<{ ok: boolean }>(r))
 
 export const removeSkill = (name: string) =>
-  fetch(`${BASE}/skills/${encodeURIComponent(name)}`, { method: 'DELETE' }).then(r => {
-    if (!r.ok) throw new Error(`Failed to remove skill: ${r.status}`)
-  })
+  fetch(`${BASE}/skills/${encodeURIComponent(name)}`, { method: 'DELETE' }).then(expectOk)
 
 export const enableSkill = (name: string, projectPath: string, agent: string) =>
   fetch(`${BASE}/skills/${encodeURIComponent(name)}/enable`, {
@@ -85,9 +105,7 @@ export const updateProject = (projectPath: string, updates: { name?: string; age
   }).then(r => json<Project>(r))
 
 export const unregisterProject = (projectPath: string) =>
-  fetch(`${BASE}/projects/${encodeURIComponent(projectPath)}`, { method: 'DELETE' }).then(r => {
-    if (!r.ok) throw new Error(`Failed to unregister project: ${r.status}`)
-  })
+  fetch(`${BASE}/projects/${encodeURIComponent(projectPath)}`, { method: 'DELETE' }).then(expectOk)
 
 // Agents
 export const getAgents = () =>

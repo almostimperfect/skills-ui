@@ -22,19 +22,26 @@ export default function AgentToggle({ skillName, projectPath, agent, status, inv
   const enabled = status === 'enabled'
 
   return (
-    <button
+    <div className="inline-flex flex-col items-center gap-1">
+      <button
       onClick={() => toggle.mutate()}
       disabled={toggle.isPending}
       className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors disabled:opacity-50 ${
         enabled ? 'bg-indigo-600' : 'bg-gray-300'
       }`}
       title={`${enabled ? 'Disable' : 'Enable'} for ${agent}`}
-    >
-      <span
+      >
+        <span
         className={`inline-block h-3.5 w-3.5 rounded-full bg-white shadow transform transition-transform ${
           enabled ? 'translate-x-4' : 'translate-x-1'
         }`}
-      />
-    </button>
+        />
+      </button>
+      {toggle.error && (
+        <span role="alert" className="text-xs text-red-600">
+          Failed to update skill: {(toggle.error as Error).message}
+        </span>
+      )}
+    </div>
   )
 }

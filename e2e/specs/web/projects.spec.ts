@@ -110,14 +110,21 @@ test.describe('Project Detail', () => {
     await expect(page.getByText('No skills installed globally.')).toBeVisible()
   })
 
-  test.fixme('UX-010/F-WEB-09: bulk actions must show progress and partial-failure feedback', async ({ page, server }) => {
+  test('UX-010/F-WEB-09: bulk actions show progress and partial-failure feedback', async ({ page, server }) => {
     await seedSkill(server.home, 'basic-skill')
     const dir = await makeProject(server.home, 'bulk-p', { agentDirs: ['.claude'] })
-    await page.route('**/api/skills/**/disable', route => route.fulfill({ status: 500, body: '{"error":"x"}' }))
+    let releaseResponse!: () => void
+    const responseReleased = new Promise<void>(resolve => { releaseResponse = resolve })
+    await page.route('**/api/skills/**/disable', async route => {
+      await responseReleased
+      await route.fulfill({ status: 500, contentType: 'application/json', body: '{"error":"x"}' })
+    })
     await page.goto(`/projects/${encodeURIComponent(dir)}`)
     await page.getByRole('button', { name: 'Disable all' }).click()
-    // DESIRED: user is told some ops failed. ACTUAL today: silent refetch.
-    await expect(page.getByText(/fail|error/i)).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Disabling...' })).toBeDisabled()
+    await expect(page.getByRole('button', { name: 'Enable all' })).toBeDisabled()
+    releaseResponse()
+    await expect(page.getByRole('alert')).toContainText('1 change failed')
   })
 
   test('UX-009/F-WEB-07: a failed toggle must surface an error, not silently revert', async ({ page, server }) => {

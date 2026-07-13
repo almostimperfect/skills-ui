@@ -3,6 +3,12 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { getProject, enableSkill, disableSkill } from '../api.js'
 import AgentToggle from '../components/AgentToggle.js'
 
+async function settleChanges(changes: Promise<unknown>[]): Promise<void> {
+  const results = await Promise.allSettled(changes)
+  const failed = results.filter(result => result.status === 'rejected').length
+  if (failed > 0) throw new Error(`${failed} ${failed === 1 ? 'change' : 'changes'} failed`)
+}
+
 export default function ProjectDetail() {
   const { projectPath: encoded } = useParams<{ projectPath: string }>()
   const projectPath = decodeURIComponent(encoded ?? '')
@@ -18,34 +24,37 @@ export default function ProjectDetail() {
   const enableAll = useMutation({
     mutationFn: async () => {
       if (!project) return
-      await Promise.all(
+      await settleChanges(
         Object.keys(project.matrix).flatMap(skillName =>
-          project.agents.map(agent =>
+          project.agents.flatMap(agent =>
             project.matrix[skillName][agent] === 'disabled'
-              ? enableSkill(skillName, projectPath, agent)
-              : Promise.resolve()
+              ? [enableSkill(skillName, projectPath, agent)]
+              : []
           )
         )
       )
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey }),
+    onSettled: () => qc.invalidateQueries({ queryKey }),
   })
 
   const disableAll = useMutation({
     mutationFn: async () => {
       if (!project) return
-      await Promise.all(
+      await settleChanges(
         Object.keys(project.matrix).flatMap(skillName =>
-          project.agents.map(agent =>
+          project.agents.flatMap(agent =>
             project.matrix[skillName][agent] === 'enabled'
-              ? disableSkill(skillName, projectPath, agent)
-              : Promise.resolve()
+              ? [disableSkill(skillName, projectPath, agent)]
+              : []
           )
         )
       )
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey }),
+    onSettled: () => qc.invalidateQueries({ queryKey }),
   })
+
+  const bulkPending = enableAll.isPending || disableAll.isPending
+  const bulkError = enableAll.error || disableAll.error
 
   if (isLoading) return <div className="p-8 text-gray-500">Loading...</div>
   if (error || !project) return <div className="p-8 text-red-600">Failed to load project</div>
@@ -62,18 +71,33 @@ export default function ProjectDetail() {
 
       <div className="flex gap-2 mb-4">
         <button
-          onClick={() => enableAll.mutate()}
-          className="px-3 py-1.5 text-xs bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-md hover:bg-indigo-100"
+          onClick={() => {
+            enableAll.reset()
+            disableAll.reset()
+            enableAll.mutate()
+          }}
+          disabled={bulkPending}
+          className="px-3 py-1.5 text-xs bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-md hover:bg-indigo-100 disabled:opacity-50"
         >
-          Enable all
+          {enableAll.isPending ? 'Enabling...' : 'Enable all'}
         </button>
         <button
-          onClick={() => disableAll.mutate()}
-          className="px-3 py-1.5 text-xs bg-gray-50 text-gray-600 border border-gray-200 rounded-md hover:bg-gray-100"
+          onClick={() => {
+            enableAll.reset()
+            disableAll.reset()
+            disableAll.mutate()
+          }}
+          disabled={bulkPending}
+          className="px-3 py-1.5 text-xs bg-gray-50 text-gray-600 border border-gray-200 rounded-md hover:bg-gray-100 disabled:opacity-50"
         >
-          Disable all
+          {disableAll.isPending ? 'Disabling...' : 'Disable all'}
         </button>
       </div>
+      {bulkError && (
+        <p role="alert" className="text-red-600 text-sm mb-4">
+          {(bulkError as Error).message}
+        </p>
+      )}
 
       {skillNames.length === 0 ? (
         <p className="text-gray-400 text-sm">No skills installed globally.</p>

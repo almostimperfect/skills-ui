@@ -61,7 +61,7 @@ test.describe('CLI: enable/disable happy path', () => {
 })
 
 test.describe('CLI: enable/disable validation gaps (registered findings)', () => {
-  test.fixme('DEBT-001/F-CLI-02: enable with unknown --agent must be rejected, not ✓', async ({ server }) => {
+  test('DEBT-001/F-CLI-02: enable with unknown --agent must be rejected, not ✓', async ({ server }) => {
     await seedSkill(server.home, 'basic-skill')
     const proj = await makeProject(server.home, 'proj-d', { agentDirs: ['.claude'] })
     const res = await runCli(server.home, ['enable', 'basic-skill', '--project', proj, '--agent', 'nonsense'])
@@ -70,7 +70,7 @@ test.describe('CLI: enable/disable validation gaps (registered findings)', () =>
     expect(res.stderr).toMatch(/agent/i)
   })
 
-  test.fixme('DEBT-001/F-CLI-02: enable for an unregistered project must be rejected', async ({ server }) => {
+  test('DEBT-001/F-CLI-02: enable for an unregistered project must be rejected', async ({ server }) => {
     await seedSkill(server.home, 'basic-skill')
     const res = await runCli(server.home, ['enable', 'basic-skill', '--project', '/not/registered', '--agent', 'claude-code'])
     // DESIRED: exit 1. ACTUAL today: exit 0, state written for an unknown project.

@@ -135,6 +135,15 @@ describe('DELETE /api/skills/:name', () => {
     expect(res.status).toBe(204)
     expect(mockRemove).toHaveBeenCalledWith('tdd-workflow')
   })
+
+  it('UX-011: returns 404 without calling removeSkill when the skill is absent', async () => {
+    mockAccess.mockRejectedValueOnce(Object.assign(new Error('missing'), { code: 'ENOENT' }))
+    const app = createApp()
+    const res = await request(app).delete('/api/skills/ghost')
+    expect(res.status).toBe(404)
+    expect(res.body).toEqual({ error: 'Skill not found' })
+    expect(mockRemove).not.toHaveBeenCalled()
+  })
 })
 
 describe.each(['enable', 'disable'] as const)('POST /api/skills/:name/%s', op => {

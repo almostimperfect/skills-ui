@@ -85,6 +85,16 @@ export function skillsRouter(): Router {
 
   router.delete('/:name', async (req, res) => {
     try {
+      const skillDir = join(homedir(), CANONICAL_SKILLS_DIR, req.params.name)
+      try {
+        await access(skillDir)
+      } catch (err: unknown) {
+        if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
+          res.status(404).json({ error: 'Skill not found' })
+          return
+        }
+        throw err
+      }
       await removeSkill(req.params.name)
       await state.cleanupSkill(req.params.name)
       res.status(204).send()

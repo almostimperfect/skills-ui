@@ -88,7 +88,7 @@ test.describe('CLI: remove a skill', () => {
     await expect(access(join(storeDir(server.home), name))).rejects.toThrow()
   })
 
-  test.fixme('UX-011: removing a nonexistent skill must error (exit 1), not report ✓ (CLI-REMOVE-02)', async ({ server }) => {
+  test('UX-011: removing a nonexistent skill must error (exit 1), not report ✓ (CLI-REMOVE-02)', async ({ server }) => {
     // DESIRED: exit 1 + clear error. ACTUAL today: the bundled binary prints
     // "No skills found to remove." but exits 0, and skills-ui blindly prints "✓ Removed".
     const res = await runCli(server.home, ['remove', 'ghost-skill'])
@@ -96,9 +96,4 @@ test.describe('CLI: remove a skill', () => {
     expect(res.stderr).toContain('Error:')
   })
 
-  test('UX-011 pin: remove of a nonexistent skill currently reports false success (delete when fixed)', async ({ server }) => {
-    const res = await runCli(server.home, ['remove', 'ghost-skill'])
-    expect(res.code).toBe(0)
-    expect(res.stdout).toContain('✓ Removed ghost-skill')
-  })
 })

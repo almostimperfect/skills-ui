@@ -2,7 +2,6 @@
 // Core modules are mocked (same pattern as tests/server/*); commander actions are
 // driven via cmd.parseAsync(args, { from: 'user' }).
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { resolve } from 'path'
 
 const mockState = {
   isDisabled: vi.fn().mockResolvedValue(false),
@@ -32,6 +31,14 @@ vi.mock('../../src/core/skills-cli.js', async importOriginal => {
 vi.mock('../../src/core/state.js', () => ({ createStateManager: vi.fn(() => mockState) }))
 vi.mock('../../src/core/projects.js', () => ({ createProjectRegistry: vi.fn(() => mockRegistry) }))
 vi.mock('../../src/core/metadata.js', () => ({ parseSkillMetadata: vi.fn() }))
+vi.mock('fs/promises', async importOriginal => {
+  const actual = await importOriginal<typeof import('fs/promises')>()
+  return {
+    ...actual,
+    access: vi.fn().mockResolvedValue(undefined),
+    stat: vi.fn().mockResolvedValue({ isDirectory: () => true }),
+  }
+})
 
 import { listSkills, addSkill, removeSkill, SkillsCliError } from '../../src/core/skills-cli.js'
 import { parseSkillMetadata } from '../../src/core/metadata.js'
@@ -43,11 +50,14 @@ import { disableCommand } from '../../src/cli/commands/disable.js'
 import { projectsCommand } from '../../src/cli/commands/projects.js'
 import { projectAddCommand } from '../../src/cli/commands/project-add.js'
 import { serveCommand } from '../../src/cli/commands/serve.js'
+import { access, stat } from 'fs/promises'
 
 const mockList = listSkills as ReturnType<typeof vi.fn>
 const mockAdd = addSkill as ReturnType<typeof vi.fn>
 const mockRemove = removeSkill as ReturnType<typeof vi.fn>
 const mockMeta = parseSkillMetadata as ReturnType<typeof vi.fn>
+const mockAccess = access as ReturnType<typeof vi.fn>
+const mockStat = stat as ReturnType<typeof vi.fn>
 
 class ExitError extends Error {
   constructor(public code: number | undefined) {
@@ -65,7 +75,16 @@ beforeEach(() => {
   mockState.disable.mockResolvedValue(undefined)
   mockState.cleanupSkill.mockResolvedValue(undefined)
   mockRegistry.listProjects.mockResolvedValue([])
-  mockRegistry.getProject.mockResolvedValue(undefined)
+  mockRegistry.getProject.mockResolvedValue({ path: '/p', name: 'p', agents: ['claude-code'] })
+  mockRegistry.registerProject.mockResolvedValue({
+    path: '/registered',
+    name: 'registered',
+    agents: [],
+  })
+  mockAccess.mockReset()
+  mockAccess.mockResolvedValue(undefined)
+  mockStat.mockReset()
+  mockStat.mockResolvedValue({ isDirectory: () => true })
   mockMeta.mockImplementation(async (_dir: string, name: string) => ({ name, description: '', source: '' }))
   logs = []
   errs = []
@@ -109,6 +128,14 @@ describe('remove', () => {
     mockRemove.mockRejectedValue(new SkillsCliError('nope', 1))
     await expect(removeCommand().parseAsync(['ghost'], { from: 'user' })).rejects.toThrow(ExitError)
     expect(errs.join('\n')).toContain('Error: nope')
+    expect(mockState.cleanupSkill).not.toHaveBeenCalled()
+  })
+
+  it('UX-011: exits 1 without calling the bundled CLI when the skill is not installed', async () => {
+    mockAccess.mockRejectedValueOnce(Object.assign(new Error('missing'), { code: 'ENOENT' }))
+    await expect(removeCommand().parseAsync(['ghost'], { from: 'user' })).rejects.toThrow(ExitError)
+    expect(errs.join('\n')).toContain('Skill not installed: ghost')
+    expect(mockRemove).not.toHaveBeenCalled()
     expect(mockState.cleanupSkill).not.toHaveBeenCalled()
   })
 })
@@ -165,6 +192,23 @@ describe.each([
     ).rejects.toThrow(ExitError)
     expect(errs.join('\n')).toContain('Error: boom')
   })
+
+  it('DEBT-001: rejects an unregistered project before mutating state', async () => {
+    mockRegistry.getProject.mockResolvedValueOnce(undefined)
+    await expect(
+      factory().parseAsync(['skill-x', '--project', '/missing', '--agent', 'claude-code'], { from: 'user' })
+    ).rejects.toThrow(ExitError)
+    expect(errs.join('\n')).toContain('Project not found: /missing')
+    expect(getMock()).not.toHaveBeenCalled()
+  })
+
+  it('DEBT-001: rejects an agent not managed by the project', async () => {
+    await expect(
+      factory().parseAsync(['skill-x', '--project', '/p', '--agent', 'codex'], { from: 'user' })
+    ).rejects.toThrow(ExitError)
+    expect(errs.join('\n')).toContain('not managed by project')
+    expect(getMock()).not.toHaveBeenCalled()
+  })
 })
 
 describe('projects', () => {
@@ -184,16 +228,29 @@ describe('projects', () => {
 })
 
 describe('project add', () => {
-  it('resolves relative paths and registers with split --agents', async () => {
+  it('registers an existing absolute directory with split --agents', async () => {
     mockRegistry.registerProject.mockImplementation(async (path: string, agents?: string[]) => ({
       path,
       name: 'rel',
       agents: agents ?? [],
     }))
-    await projectAddCommand().parseAsync(['./rel', '--agents', 'claude-code, codex'], { from: 'user' })
-    expect(mockRegistry.registerProject).toHaveBeenCalledWith(resolve('./rel'), ['claude-code', 'codex'])
+    await projectAddCommand().parseAsync(['/projects/rel', '--agents', 'claude-code, codex'], { from: 'user' })
+    expect(mockRegistry.registerProject).toHaveBeenCalledWith('/projects/rel', ['claude-code', 'codex'])
     expect(logs.join('\n')).toContain('✓ Registered rel')
     expect(logs.join('\n')).toContain('Agents: claude-code, codex')
+  })
+
+  it('UX-003: rejects a relative path', async () => {
+    await expect(projectAddCommand().parseAsync(['./rel'], { from: 'user' })).rejects.toThrow(ExitError)
+    expect(errs.join('\n')).toContain('absolute path')
+    expect(mockRegistry.registerProject).not.toHaveBeenCalled()
+  })
+
+  it('UX-003: rejects a nonexistent path', async () => {
+    mockStat.mockRejectedValueOnce(Object.assign(new Error('missing'), { code: 'ENOENT' }))
+    await expect(projectAddCommand().parseAsync(['/missing'], { from: 'user' })).rejects.toThrow(ExitError)
+    expect(errs.join('\n')).toContain('does not exist')
+    expect(mockRegistry.registerProject).not.toHaveBeenCalled()
   })
 })
 

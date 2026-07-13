@@ -43,7 +43,7 @@ test.describe('CLI: project add', () => {
     expect(lines.length).toBe(1)
   })
 
-  test.fixme('UX-003/F-CLI-01: registering a NONEXISTENT path must fail, not print ✓', async ({ server }) => {
+  test('UX-003/F-CLI-01: registering a NONEXISTENT path must fail, not print ✓', async ({ server }) => {
     const res = await runCli(server.home, ['project', 'add', '/definitely/not/here'])
     // DESIRED: exit 1 + "does not exist" (parity with POST /api/projects).
     // ACTUAL today: resolve()d and registered with "✓ Registered".
@@ -51,15 +51,12 @@ test.describe('CLI: project add', () => {
     expect(res.stderr).toMatch(/exist/i)
   })
 
-  test('SCEN-PROJ-REL-01: relative path is resolved against CWD (current behavior pin)', async ({ server }) => {
+  test('UX-003/CLI-PROJ-04: relative project paths are rejected consistently with the API', async ({ server }) => {
     const parent = join(server.home, 'projects')
     await mkdir(join(parent, 'relproj'), { recursive: true })
     const res = await runCli(server.home, ['project', 'add', './relproj'], { cwd: parent })
-    expect(res.code).toBe(0)
-    // The stored path must be the resolved ABSOLUTE path, never "./relproj"
-    const list = await runCli(server.home, ['projects'])
-    expect(list.stdout).toContain(join(parent, 'relproj'))
-    expect(list.stdout).not.toContain('./relproj')
+    expect(res.code).toBe(1)
+    expect(res.stderr).toMatch(/absolute/i)
   })
 })
 

@@ -1,0 +1,14 @@
+FROM mcr.microsoft.com/playwright:v1.49.1-jammy
+
+WORKDIR /app
+
+COPY package.json package-lock.json ./
+RUN npm ci
+
+COPY . .
+RUN npm run build
+
+ENV CI=1
+ENV HOME=/tmp/skills-ui-development-e2e/home
+
+CMD ["npx", "playwright", "test", "--config", "e2e/playwright.config.ts"]

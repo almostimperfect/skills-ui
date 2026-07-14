@@ -60,16 +60,18 @@ export default function ProjectDetail() {
 
   const enableAll = useMutation({
     mutationFn: async () => {
-      if (!project) return
-      await Promise.all(uniqueProjectActions(project, 'enable', projectPath))
+      if (!project) return 0
+      const results = await Promise.allSettled(uniqueProjectActions(project, 'enable', projectPath))
+      return results.filter(result => result.status === 'rejected').length
     },
     onSuccess: () => qc.invalidateQueries({ queryKey }),
   })
 
   const disableAll = useMutation({
     mutationFn: async () => {
-      if (!project) return
-      await Promise.all(uniqueProjectActions(project, 'disable', projectPath))
+      if (!project) return 0
+      const results = await Promise.allSettled(uniqueProjectActions(project, 'disable', projectPath))
+      return results.filter(result => result.status === 'rejected').length
     },
     onSuccess: () => qc.invalidateQueries({ queryKey }),
   })
@@ -100,17 +102,25 @@ export default function ProjectDetail() {
       <div className="mb-4 flex flex-wrap gap-2">
         <button
           onClick={() => enableAll.mutate()}
+          disabled={enableAll.isPending || disableAll.isPending}
           className="rounded-md border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-800 hover:bg-slate-50"
         >
-          Install all available
+          {enableAll.isPending ? 'Installing...' : 'Install all available'}
         </button>
         <button
           onClick={() => disableAll.mutate()}
+          disabled={enableAll.isPending || disableAll.isPending}
           className="rounded-md border border-red-200 bg-white px-3 py-2 text-xs font-medium text-red-700 hover:bg-red-50"
         >
-          Uninstall project installs
+          {disableAll.isPending ? 'Uninstalling...' : 'Uninstall project installs'}
         </button>
       </div>
+
+      {((enableAll.data ?? 0) > 0 || (disableAll.data ?? 0) > 0) && (
+        <p role="alert" className="mb-4 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {(enableAll.data ?? disableAll.data)} change{(enableAll.data ?? disableAll.data) === 1 ? '' : 's'} failed. Successful changes were preserved.
+        </p>
+      )}
 
       {skills.length === 0 ? (
         <p className="text-sm text-slate-400">No managed skills found.</p>

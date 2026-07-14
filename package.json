@@ -16,7 +16,8 @@
     "seed:xtest": "node scripts/seed-xtest-data.mjs seed",
     "cleanup:xtest": "node scripts/seed-xtest-data.mjs cleanup",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:docker": "docker build -f Dockerfile.test -t skills-ui-development-test . && docker run --rm skills-ui-development-test"
   },
   "dependencies": {
     "commander": "^12.1.0",

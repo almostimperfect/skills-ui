@@ -1,13 +1,14 @@
 import express from 'express'
 import { join } from 'path'
 import { fileURLToPath } from 'url'
+import { existsSync } from 'fs'
 import { agentsRouter } from './routes/agents.js'
 import { skillsRouter } from './routes/skills.js'
 import { projectsRouter } from './routes/projects.js'
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url))
 
-export function createApp() {
+export function createApp(webDistPathOverride?: string) {
   const app = express()
   app.use(express.json())
 
@@ -17,7 +18,8 @@ export function createApp() {
   app.use('/api/projects', projectsRouter())
 
   // Serve static web UI (only in production)
-  const webDistPath = join(__dirname, '..', 'web')
+  const webDistPath = webDistPathOverride ?? join(__dirname, '..', 'web')
+  const webIndexPath = join(webDistPath, 'index.html')
   app.use(express.static(webDistPath))
 
   // Return a JSON 404 for unknown /api/* routes instead of falling through to the SPA
@@ -26,7 +28,11 @@ export function createApp() {
   })
 
   app.get('*', (_req, res) => {
-    res.sendFile(join(webDistPath, 'index.html'))
+    if (!existsSync(webIndexPath)) {
+      res.status(503).send('Web UI is not built. Run npm run build.')
+      return
+    }
+    res.sendFile(webIndexPath)
   })
 
   return app

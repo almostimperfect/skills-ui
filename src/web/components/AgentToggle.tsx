@@ -52,7 +52,8 @@ export default function AgentToggle({ skillId, projectPath, agent, status, inval
   ].filter(Boolean)
 
   return (
-    <button
+    <div className="inline-flex flex-col items-center gap-1">
+      <button
       onClick={() => {
         if (!interactive || toggle.isPending) return
         toggle.mutate()
@@ -68,6 +69,12 @@ export default function AgentToggle({ skillId, projectPath, agent, status, inval
       title={titleParts.join(' | ')}
     >
       {toggle.isPending ? 'Working...' : label}
-    </button>
+      </button>
+      {toggle.isError && (
+        <span role="alert" className="max-w-48 text-xs text-red-700">
+          {toggle.error instanceof Error ? toggle.error.message : 'Agent update failed.'}
+        </span>
+      )}
+    </div>
   )
 }

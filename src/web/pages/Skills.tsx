@@ -165,8 +165,15 @@ export default function Skills() {
 
       {isLoading && <p className="text-sm text-slate-500">Loading assets...</p>}
       {error && (
-        <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        <div role="alert" className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
           Failed to load skill assets. Reconcile may be blocked by a missing project or skills CLI error.
+        </div>
+      )}
+      {(removeMutation.isError || installGlobalMutation.isError) && (
+        <div role="alert" className="mb-4 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {(removeMutation.error ?? installGlobalMutation.error) instanceof Error
+            ? (removeMutation.error ?? installGlobalMutation.error as Error).message
+            : 'Failed to update the asset installation.'}
         </div>
       )}
 

@@ -50,8 +50,18 @@ export default function Projects() {
       </div>
 
       {showAdd && (
-        <div className="bg-white rounded-lg border border-gray-200 p-4 mb-4">
+        <form
+          className="bg-white rounded-lg border border-gray-200 p-4 mb-4"
+          onSubmit={event => {
+            event.preventDefault()
+            if (newPath && !addMutation.isPending) addMutation.mutate()
+          }}
+          onKeyDown={event => {
+            if (event.key === 'Escape') setShowAdd(false)
+          }}
+        >
           <input
+            autoFocus
             type="text"
             value={newPath}
             onChange={e => setNewPath(e.target.value)}
@@ -63,6 +73,7 @@ export default function Projects() {
               const enabled = newAgents.includes(agent)
               return (
                 <button
+                  type="button"
                   key={agent}
                   onClick={() => setNewAgents(enabled
                     ? newAgents.filter(item => item !== agent)
@@ -82,17 +93,30 @@ export default function Projects() {
           </div>
           <div className="flex gap-2">
             <button
-              onClick={() => addMutation.mutate()}
+              type="submit"
               disabled={!newPath || addMutation.isPending}
               className="px-3 py-1.5 text-sm bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:opacity-50"
             >
               {addMutation.isPending ? 'Adding...' : 'Add'}
             </button>
-            <button onClick={() => setShowAdd(false)} className="px-3 py-1.5 text-sm text-gray-600">
+            <button type="button" onClick={() => setShowAdd(false)} className="px-3 py-1.5 text-sm text-gray-600">
               Cancel
             </button>
           </div>
-        </div>
+          {addMutation.isError && (
+            <p role="alert" className="mt-3 text-sm text-red-700">
+              {addMutation.error instanceof Error ? addMutation.error.message : 'Failed to add project.'}
+            </p>
+          )}
+        </form>
+      )}
+
+      {(removeMutation.isError || updateAgentsMutation.isError) && (
+        <p role="alert" className="mb-4 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {(removeMutation.error ?? updateAgentsMutation.error) instanceof Error
+            ? (removeMutation.error ?? updateAgentsMutation.error as Error).message
+            : 'Failed to update the project.'}
+        </p>
       )}
 
       {isLoading && <p className="text-gray-500">Loading...</p>}
@@ -132,7 +156,10 @@ export default function Projects() {
               </div>
             </div>
             <button
-              onClick={() => removeMutation.mutate(project.path)}
+              onClick={() => {
+                if (!window.confirm(`Remove ${project.name} from managed projects?`)) return
+                removeMutation.mutate(project.path)
+              }}
               className="text-sm text-red-600 hover:text-red-800"
             >
               Remove

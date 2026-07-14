@@ -1,6 +1,6 @@
 import { useParams, Link } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { getSkill, getSkillMaintenance, installGlobalSkill, splitGlobalSkill, updateSkill } from '../api.js'
+import { ApiError, getSkill, getSkillMaintenance, installGlobalSkill, splitGlobalSkill, updateSkill } from '../api.js'
 import AgentToggle from '../components/AgentToggle.js'
 
 export default function SkillDetail() {
@@ -50,6 +50,7 @@ export default function SkillDetail() {
   })
 
   if (isLoading) return <div className="p-8 text-gray-500">Loading...</div>
+  if (error instanceof ApiError && error.status === 404) return <div className="p-8 text-red-600">Skill not found</div>
   if (error || !skill) return <div className="p-8 text-red-600">Failed to load skill</div>
 
   const projectPaths = Object.keys(skill.status)

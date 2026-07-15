@@ -71,7 +71,11 @@ export default function Projects() {
             if (event.key === 'Escape') setShowAdd(false)
           }}
         >
+          <label htmlFor="project-path" className="mb-1 block text-sm font-medium text-slate-700">
+            Project path
+          </label>
           <input
+            id="project-path"
             autoFocus
             type="text"
             value={newPath}

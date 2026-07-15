@@ -102,7 +102,7 @@ export default function SkillDetail() {
   return (
     <div className="mx-auto max-w-7xl p-4 sm:p-6 lg:p-8">
       <Link to="/skills" className="mb-4 inline-block text-sm font-medium text-slate-600 hover:text-slate-950">
-        ← Back to assets
+        ← Back to Skills
       </Link>
 
       <div className="mb-6 rounded-lg border border-slate-200 bg-white p-5">
@@ -268,6 +268,8 @@ export default function SkillDetail() {
             <button
               onClick={() => {
                 if (!canSplitGlobal || splitMutation.isPending) return
+                const impact = globalRows.map(({ projectPath, agent }) => `${projectPath.split(/[\\/]/).filter(Boolean).pop()} (${agent})`).join(', ')
+                if (!window.confirm(`Split ${skill.name} into project copies? This removes the global installation after creating local copies for: ${impact}.`)) return
                 splitMutation.mutate()
               }}
               disabled={!canSplitGlobal || splitMutation.isPending}

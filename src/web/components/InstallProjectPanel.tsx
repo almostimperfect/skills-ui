@@ -18,6 +18,9 @@ export default function InstallProjectPanel({ skill }: Props) {
   }, [projects, selectedPath])
 
   const selected = projects?.find(project => project.path === selectedPath)
+  const selectedStatuses = selected ? Object.values(skill.status[selected.path] ?? {}) : []
+  const inheritedGlobally = selectedStatuses.some(status => status.state === 'global')
+  const installedLocally = selectedStatuses.some(status => status.state === 'project')
   const actions = useMemo(() => {
     if (!selected) return []
     const rows = Object.entries(skill.status[selected.path] ?? {}).filter(([, status]) => status.canEnable)
@@ -85,7 +88,13 @@ export default function InstallProjectPanel({ skill }: Props) {
               )
             })}
             {selected && actions.length === 0 && (
-              <p className="text-sm text-slate-500">No available Agent targets in this project.</p>
+              <p className="text-sm text-slate-500">
+                {installedLocally
+                  ? 'Already installed in this project.'
+                  : inheritedGlobally
+                    ? 'Already available through the global installation. Use Split Global Into Projects below to replace inherited access with project copies.'
+                    : 'No available Agent targets in this project.'}
+              </p>
             )}
           </div>
         </>

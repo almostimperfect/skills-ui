@@ -111,13 +111,13 @@ test('UX-005/007: Add Project supports keyboard control and visible validation e
 
   await page.goto('/projects')
   await page.getByRole('button', { name: 'Add Project' }).click()
-  const input = page.getByPlaceholder('/absolute/path/to/project')
+  const input = page.getByLabel('Project path')
   await expect(input).toBeFocused()
   await page.keyboard.press('Escape')
   await expect(input).toBeHidden()
 
   await page.getByRole('button', { name: 'Add Project' }).click()
-  await page.getByPlaceholder('/absolute/path/to/project').fill('./relative')
+  await page.getByLabel('Project path').fill('./relative')
   await page.keyboard.press('Enter')
   await expect(page.getByRole('alert')).toContainText('Enter an absolute project path.')
   expect(postRequests).toBe(0)
@@ -136,7 +136,7 @@ test('project registration returns to the requesting Skill detail', async ({ pag
 
   await page.goto('/projects?returnSkill=basic-skill-id')
   await page.getByRole('button', { name: 'Add Project' }).click()
-  await page.getByPlaceholder('/absolute/path/to/project').fill(projectPath)
+  await page.getByLabel('Project path').fill(projectPath)
   await page.getByRole('button', { name: 'Add', exact: true }).click()
 
   await expect(page).toHaveURL(/\/skills\/basic-skill-id$/)
@@ -253,6 +253,7 @@ test('UX-009: a failed explicit project removal renders feedback', async ({ page
 
 test('targeted install: a Skill is installed into a selected project without leaving detail', async ({ page }) => {
   let enableRequests = 0
+  let installedInProject = false
   const projectSkill = {
     ...skill,
     instances: [],
@@ -277,12 +278,17 @@ test('targeted install: a Skill is installed into a selected project without lea
   }))
   await page.route('**/api/skills/basic-skill-id/enable', route => {
     enableRequests += 1
+    installedInProject = true
     return route.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true}' })
   })
   await page.route('**/api/skills/basic-skill-id', route => route.fulfill({
     status: 200,
     contentType: 'application/json',
-    body: JSON.stringify(projectSkill),
+    body: JSON.stringify(installedInProject ? {
+      ...projectSkill,
+      instances: [{ scope: 'project', path: `${projectPath}/.agents/skills/basic-skill`, projectPath, agents: ['Codex'] }],
+      status: { [projectPath]: { codex: { state: 'project', canEnable: false, canDisable: true } } },
+    } : projectSkill),
   }))
 
   await page.goto('/skills/basic-skill-id')
@@ -290,7 +296,38 @@ test('targeted install: a Skill is installed into a selected project without lea
 
   await expect(page).toHaveURL(/\/skills\/basic-skill-id$/)
   await expect(page.getByText('Installed basic-skill in app.')).toBeVisible()
+  await expect(page.getByText('Already installed in this project.')).toBeVisible()
   expect(enableRequests).toBe(1)
+})
+
+test('split global requires impact confirmation and explains inherited availability', async ({ page }) => {
+  let splitRequests = 0
+  await page.route('**/api/projects', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([project]) }))
+  await page.route('**/api/skills/basic-skill-id/maintenance', route => route.fulfill({
+    status: 200, contentType: 'application/json', body: JSON.stringify({
+      update: { supported: false, status: 'unsupported', checkedAt: '2026-07-15T00:00:00.000Z' }, modifiedProjects: [],
+    }),
+  }))
+  await page.route('**/api/skills/basic-skill-id/split-global', route => {
+    splitRequests += 1
+    return route.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true}' })
+  })
+  await page.route('**/api/skills/basic-skill-id', route => route.fulfill({
+    status: 200, contentType: 'application/json', body: JSON.stringify({
+      ...skill,
+      status: { [projectPath]: { codex: { state: 'global', canEnable: false, canDisable: false } } },
+    }),
+  }))
+
+  await page.goto('/skills/basic-skill-id')
+  await expect(page.getByText('Already available through the global installation.')).toBeVisible()
+  page.once('dialog', async dialog => {
+    expect(dialog.message()).toContain('removes the global installation')
+    expect(dialog.message()).toContain('app (codex)')
+    await dialog.accept()
+  })
+  await page.getByRole('button', { name: 'Split Global Into Projects' }).click()
+  await expect.poll(() => splitRequests).toBe(1)
 })
 
 test('maintenance recovery reinstalls a modified project copy from Skill detail', async ({ page }) => {

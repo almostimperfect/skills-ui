@@ -28,6 +28,8 @@ const mockInventoryInstance = {
   updateGlobalSkill: vi.fn().mockResolvedValue(undefined),
   removeGlobalSkill: vi.fn().mockResolvedValue(undefined),
   splitGlobalSkill: vi.fn().mockResolvedValue(undefined),
+  reinstallProjectSkill: vi.fn().mockResolvedValue(undefined),
+  forgetSkill: vi.fn().mockResolvedValue(undefined),
 }
 const mockGetSkillMaintenance = vi.fn()
 
@@ -57,6 +59,8 @@ beforeEach(() => {
   mockInventoryInstance.updateGlobalSkill.mockReset()
   mockInventoryInstance.removeGlobalSkill.mockReset()
   mockInventoryInstance.splitGlobalSkill.mockReset()
+  mockInventoryInstance.reinstallProjectSkill.mockReset()
+  mockInventoryInstance.forgetSkill.mockReset()
   mockInventoryInstance.reconcile.mockReset()
   mockGetSkillMaintenance.mockReset()
   mockRegistryInstance.listProjects.mockResolvedValue([])
@@ -72,6 +76,23 @@ describe('GET /api/skills', () => {
     const res = await request(app).get('/api/skills')
     expect(res.status).toBe(200)
     expect(res.body[0].name).toBe('tdd-workflow')
+  })
+})
+
+describe('Skill recovery and catalog deletion', () => {
+  it('reinstalls a project copy from the recorded source', async () => {
+    mockRegistryInstance.listProjects.mockResolvedValue([{ path: '/synthetic/project', name: 'project', agents: ['codex'] }])
+    mockInventoryInstance.resolveSkillRef.mockResolvedValue({ id: 'skill-id', name: 'skill', instances: [] })
+    const res = await request(createApp()).post('/api/skills/skill-id/reinstall-project').send({ projectPath: '/synthetic/project' })
+    expect(res.status).toBe(200)
+    expect(mockInventoryInstance.reinstallProjectSkill).toHaveBeenCalledWith('skill-id', '/synthetic/project', expect.any(Array))
+  })
+
+  it('forgets a catalog-only Skill', async () => {
+    mockInventoryInstance.resolveSkillRef.mockResolvedValue({ id: 'skill-id', name: 'skill', instances: [] })
+    const res = await request(createApp()).delete('/api/skills/skill-id/catalog')
+    expect(res.status).toBe(204)
+    expect(mockInventoryInstance.forgetSkill).toHaveBeenCalledWith('skill-id', [])
   })
 })
 

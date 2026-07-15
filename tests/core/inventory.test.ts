@@ -134,6 +134,58 @@ describe('inventory reconcile', () => {
     expect(skill?.reinstallable).toBe(true)
   })
 
+  it('forgets only catalog state and an unshared managed archive', async () => {
+    const managedArchive = join(archiveDir, 'forgotten-skill')
+    const externalSource = join(tmpPath, 'external-source')
+    await writeSkill(managedArchive, 'forgotten-skill')
+    await writeSkill(externalSource, 'external-skill')
+    await writeFile(inventoryPath, JSON.stringify({
+      version: 2,
+      skills: {
+        forgotten: {
+          id: 'forgotten', name: 'forgotten-skill', description: '', source: managedArchive,
+          reinstallSource: managedArchive, reinstallable: true, sourceType: 'archive',
+          archivedPath: managedArchive, instances: [],
+        },
+        external: {
+          id: 'external', name: 'external-skill', description: '', source: externalSource,
+          reinstallSource: externalSource, reinstallable: true, sourceType: 'local', instances: [],
+        },
+      },
+    }))
+
+    const manager = createInventoryManager(inventoryPath, archiveDir)
+    await manager.forgetSkill('forgotten', [project])
+    await manager.forgetSkill('external', [project])
+
+    const state = JSON.parse(await readFile(inventoryPath, 'utf-8'))
+    expect(state.skills).toEqual({})
+    await expect(readFile(join(managedArchive, 'SKILL.md'), 'utf-8')).rejects.toThrow()
+    expect(await readFile(join(externalSource, 'SKILL.md'), 'utf-8')).toContain('external-skill')
+  })
+
+  it('rejects forgetting a Skill that still has an installation', async () => {
+    const skillDir = join(projectPath, '.agents', 'skills', 'installed-skill')
+    await writeSkill(skillDir, 'installed-skill')
+    await writeFile(inventoryPath, JSON.stringify({ version: 2, skills: {
+      installed: {
+        id: 'installed', name: 'installed-skill', description: '', source: skillDir,
+        reinstallSource: skillDir, reinstallable: true, sourceType: 'local',
+        instances: [{ scope: 'project', path: skillDir, projectPath, agents: ['Codex'] }],
+      },
+    } }))
+    mockListInstalledSkills.mockImplementation(async (options?: { global?: boolean; cwd?: string }) => {
+      if (options?.global || options?.cwd !== projectPath) return []
+      return [{
+        name: 'installed-skill', description: '', path: skillDir,
+        scope: 'project' as const, agents: ['Codex'],
+      }]
+    })
+    const manager = createInventoryManager(inventoryPath, archiveDir)
+
+    await expect(manager.forgetSkill('installed', [project])).rejects.toThrow('still installed')
+  })
+
   it('keeps every prior catalog id resolvable when content changes and the live instance disappears', async () => {
     const skillDir = join(projectPath, '.agents', 'skills', 'continuity-skill')
     await writeSkill(skillDir, 'continuity-skill', 'First version')

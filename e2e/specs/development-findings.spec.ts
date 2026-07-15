@@ -293,6 +293,47 @@ test('targeted install: a Skill is installed into a selected project without lea
   expect(enableRequests).toBe(1)
 })
 
+test('maintenance recovery reinstalls a modified project copy from Skill detail', async ({ page }) => {
+  let requests = 0
+  await page.route('**/api/projects', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([project]) }))
+  await page.route('**/api/skills/basic-skill-id/maintenance', route => route.fulfill({
+    status: 200, contentType: 'application/json', body: JSON.stringify({
+      update: { supported: false, status: 'unsupported', checkedAt: '2026-07-15T00:00:00.000Z' },
+      modifiedProjects: [{ projectPath, paths: [`${projectPath}/.agents/skills/basic-skill`] }],
+    }),
+  }))
+  await page.route('**/api/skills/basic-skill-id/reinstall-project', route => {
+    requests += 1
+    return route.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true}' })
+  })
+  await page.route('**/api/skills/basic-skill-id', route => route.fulfill({
+    status: 200, contentType: 'application/json', body: JSON.stringify({ ...skill, status: { [projectPath]: {} } }),
+  }))
+
+  await page.goto('/skills/basic-skill-id')
+  page.once('dialog', dialog => dialog.accept())
+  await page.getByRole('button', { name: 'Reinstall from source' }).click()
+  await expect.poll(() => requests).toBe(1)
+})
+
+test('catalog-only Skill can be forgotten after confirmation', async ({ page }) => {
+  await page.route('**/api/projects', route => route.fulfill({ status: 200, contentType: 'application/json', body: '[]' }))
+  await page.route('**/api/skills/basic-skill-id/maintenance', route => route.fulfill({
+    status: 200, contentType: 'application/json', body: JSON.stringify({
+      update: { supported: false, status: 'unsupported', checkedAt: '2026-07-15T00:00:00.000Z' }, modifiedProjects: [],
+    }),
+  }))
+  await page.route('**/api/skills/basic-skill-id/catalog', route => route.fulfill({ status: 204 }))
+  await page.route('**/api/skills/basic-skill-id', route => route.fulfill({
+    status: 200, contentType: 'application/json', body: JSON.stringify({ ...skill, instances: [], status: {} }),
+  }))
+
+  await page.goto('/skills/basic-skill-id')
+  page.once('dialog', dialog => dialog.accept())
+  await page.getByRole('button', { name: 'Forget Skill' }).click()
+  await expect(page).toHaveURL(/\/skills$/)
+})
+
 test('UX-010: bulk uninstall shows progress and partial failure count', async ({ page }) => {
   await page.route('**/api/projects/**', route => route.fulfill({
     status: 200,

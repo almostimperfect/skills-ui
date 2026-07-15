@@ -164,6 +164,16 @@ export const installGlobalSkill = (id: string) =>
     method: 'POST',
   }).then(r => json<{ ok: boolean }>(r))
 
+export const reinstallProjectSkill = (id: string, projectPath: string) =>
+  fetch(`${BASE}/skills/${encodeURIComponent(id)}/reinstall-project`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ projectPath }),
+  }).then(r => json<{ ok: boolean }>(r))
+
+export const forgetCatalogSkill = (id: string) =>
+  fetch(`${BASE}/skills/${encodeURIComponent(id)}/catalog`, { method: 'DELETE' }).then(expectOk)
+
 // Projects
 export const getProjects = () =>
   fetch(`${BASE}/projects`).then(r => json<Project[]>(r))

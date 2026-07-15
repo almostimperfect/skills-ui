@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ApiError, getSkill, getSkillMaintenance, installGlobalSkill, splitGlobalSkill, updateSkill } from '../api.js'
+import { ApiError, forgetCatalogSkill, getSkill, getSkillMaintenance, installGlobalSkill, reinstallProjectSkill, splitGlobalSkill, updateSkill } from '../api.js'
 import AgentSkillControl from '../components/AgentSkillControl.js'
 import InstallProjectPanel from '../components/InstallProjectPanel.js'
 
@@ -49,6 +49,25 @@ export default function SkillDetail() {
         qc.invalidateQueries({ queryKey: ['skill', skillId, 'maintenance'] }),
         qc.invalidateQueries({ queryKey: ['skills'] }),
       ])
+    },
+  })
+  const reinstallProjectMutation = useMutation({
+    mutationFn: (projectPath: string) => reinstallProjectSkill(skillId, projectPath),
+    onSuccess: async () => {
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ['skill'] }),
+        qc.invalidateQueries({ queryKey: ['project'] }),
+        qc.invalidateQueries({ queryKey: ['skills'] }),
+        qc.invalidateQueries({ queryKey: ['overview'] }),
+      ])
+    },
+  })
+  const forgetMutation = useMutation({
+    mutationFn: () => forgetCatalogSkill(skillId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['skills'] })
+      qc.invalidateQueries({ queryKey: ['overview'] })
+      navigate('/skills', { replace: true })
     },
   })
 
@@ -106,6 +125,18 @@ export default function SkillDetail() {
                 {installGlobalMutation.isPending ? 'Installing...' : 'Install Globally'}
               </button>
             )}
+            {instances.length === 0 && (
+              <button
+                onClick={() => {
+                  if (!window.confirm(`Forget ${skill.name}? This removes it from the catalog. External source directories are preserved.`)) return
+                  forgetMutation.mutate()
+                }}
+                disabled={forgetMutation.isPending}
+                className="rounded-md border border-red-200 bg-white px-3 py-2 text-xs font-medium text-red-700 hover:bg-red-50 disabled:opacity-60"
+              >
+                {forgetMutation.isPending ? 'Forgetting...' : 'Forget Skill'}
+              </button>
+            )}
           </div>
         </div>
         {installGlobalMutation.isError && (
@@ -161,9 +192,23 @@ export default function SkillDetail() {
                   <p className="mt-1 text-xs text-slate-500">Last updated: {maintenance.update.updatedAt}</p>
                 )}
                 {maintenance.modifiedProjects.length > 0 ? (
-                  <p className="mt-2 text-xs text-amber-700">
-                    Modified project copies: {maintenance.modifiedProjects.map(project => project.projectPath.split('/').pop()).join(', ')}
-                  </p>
+                  <div className="mt-3 space-y-2">
+                    {maintenance.modifiedProjects.map(project => (
+                      <div key={project.projectPath} className="flex flex-wrap items-center gap-2 text-xs text-amber-800">
+                        <span>Modified project copy: {project.projectPath.split(/[\\/]/).filter(Boolean).pop()}</span>
+                        <button
+                          onClick={() => {
+                            if (!window.confirm(`Reinstall ${skill.name} from its recorded source? Local changes in this project copy will be replaced.`)) return
+                            reinstallProjectMutation.mutate(project.projectPath)
+                          }}
+                          disabled={reinstallProjectMutation.isPending}
+                          className="font-medium underline disabled:opacity-60"
+                        >
+                          {reinstallProjectMutation.isPending ? 'Reinstalling...' : 'Reinstall from source'}
+                        </button>
+                      </div>
+                    ))}
+                  </div>
                 ) : (
                   <p className="mt-2 text-xs text-slate-500">No modified project-local copies detected.</p>
                 )}
@@ -172,6 +217,13 @@ export default function SkillDetail() {
             {updateMutation.isError && (
               <p className="mt-2 text-xs text-red-700">
                 {updateMutation.error instanceof Error ? updateMutation.error.message : 'Failed to update the global skill.'}
+              </p>
+            )}
+            {(reinstallProjectMutation.isError || forgetMutation.isError) && (
+              <p role="alert" className="mt-2 text-xs text-red-700">
+                {(reinstallProjectMutation.error ?? forgetMutation.error) instanceof Error
+                  ? (reinstallProjectMutation.error ?? forgetMutation.error as Error).message
+                  : 'The maintenance action failed.'}
               </p>
             )}
           </div>

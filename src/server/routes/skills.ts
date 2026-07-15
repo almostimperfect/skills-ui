@@ -71,6 +71,49 @@ export function skillsRouter(): Router {
     }
   })
 
+  router.post('/:name/reinstall-project', async (req, res) => {
+    const { projectPath } = req.body as { projectPath?: string }
+    if (!projectPath) {
+      res.status(400).json({ error: 'projectPath is required' })
+      return
+    }
+    try {
+      const projects = await registry.listProjects()
+      if (!projects.some(project => project.path === projectPath)) {
+        res.status(404).json({ error: 'Project not found' })
+        return
+      }
+      const skill = await inventory.resolveSkillRef(req.params.name, projects)
+      if (!skill) {
+        res.status(404).json({ error: 'Skill not found' })
+        return
+      }
+      await inventory.reinstallProjectSkill(skill.id, projectPath, projects)
+      res.json({ ok: true })
+    } catch (err) {
+      sendSafeError(res, err)
+    }
+  })
+
+  router.delete('/:name/catalog', async (req, res) => {
+    try {
+      const projects = await registry.listProjects()
+      const skill = await inventory.resolveSkillRef(req.params.name, projects)
+      if (!skill) {
+        res.status(404).json({ error: 'Skill not found' })
+        return
+      }
+      if (skill.instances.length > 0) {
+        res.status(409).json({ error: 'Remove every installation before forgetting this Skill.' })
+        return
+      }
+      await inventory.forgetSkill(skill.id, projects)
+      res.status(204).send()
+    } catch (err) {
+      sendSafeError(res, err)
+    }
+  })
+
   router.post('/', async (req, res) => {
     const { source } = req.body as { source?: string }
     if (!source) {

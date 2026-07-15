@@ -1,5 +1,5 @@
 import { access, cp, mkdir, readFile, readdir, rm, stat } from 'fs/promises'
-import { dirname, isAbsolute, join } from 'path'
+import { dirname, isAbsolute, join, resolve, sep } from 'path'
 import { createHash } from 'crypto'
 import { readJson, writeJson } from './file-store.js'
 import { addSkill, listInstalledSkills, removeSkill, SkillsCliError } from './skills-cli.js'
@@ -353,6 +353,8 @@ export interface InventoryManager {
   updateGlobalSkill(id: string, projects: Project[], agents: string[]): Promise<void>
   removeGlobalSkill(id: string, projects: Project[]): Promise<void>
   splitGlobalSkill(id: string, projects: Project[]): Promise<void>
+  reinstallProjectSkill(id: string, projectPath: string, projects: Project[]): Promise<void>
+  forgetSkill(id: string, projects: Project[]): Promise<void>
 }
 
 export function createInventoryManager(inventoryPath: string, archiveDir: string): InventoryManager {
@@ -789,6 +791,48 @@ export function createInventoryManager(inventoryPath: string, archiveDir: string
 
       await this.removeGlobalSkill(skill.id, projects)
       await this.reconcile(projects)
+    },
+
+    async reinstallProjectSkill(id, projectPath, projects) {
+      const inventory = await this.reconcile(projects)
+      const skill = inventory.skills[id] ?? Object.values(inventory.skills)
+        .find(candidate => candidate.aliases?.includes(id))
+      const project = projects.find(candidate => candidate.path === projectPath)
+      if (!skill) throw new Error('Skill not found')
+      if (!project) throw new Error('Project not found')
+      if (!skill.reinstallable || !skill.reinstallSource) throw new Error('Skill source is unavailable')
+      if (await installProjectSkillCopy(skill, projectPath, project.agents)) {
+        await this.reconcile(projects)
+        return
+      }
+      await addSkill(skill.reinstallSource, {
+        cwd: projectPath,
+        skillNames: [skill.name],
+        agents: project.agents,
+      })
+      await this.reconcile(projects)
+    },
+
+    async forgetSkill(id, projects) {
+      const state = await this.reconcile(projects)
+      const skill = state.skills[id] ?? Object.values(state.skills)
+        .find(candidate => candidate.aliases?.includes(id))
+      if (!skill) throw new Error('Skill not found')
+      if (skill.instances.length > 0) throw new Error('Skill is still installed')
+
+      delete state.skills[skill.id]
+      await write(state)
+
+      if (!skill.archivedPath) return
+      const managedRoot = resolve(archiveDir)
+      const archivedPath = resolve(skill.archivedPath)
+      const insideManagedArchive = archivedPath === managedRoot || archivedPath.startsWith(`${managedRoot}${sep}`)
+      const shared = Object.values(state.skills).some(candidate =>
+        candidate.archivedPath && resolve(candidate.archivedPath) === archivedPath
+      )
+      if (insideManagedArchive && !shared) {
+        await rm(archivedPath, { recursive: true, force: true })
+      }
     },
   }
 }

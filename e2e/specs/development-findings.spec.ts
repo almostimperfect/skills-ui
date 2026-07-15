@@ -44,7 +44,7 @@ test('UX-005/006: failed global uninstall shows the server message after confirm
   expect(confirmed).toBe(true)
 })
 
-test('UX-007: Add Asset supports autofocus, Escape, Enter and human-readable errors', async ({ page }) => {
+test('UX-007: Install new Skill explains global effects and supports keyboard control', async ({ page }) => {
   await routeSkillsList(page, [])
   await page.route('**/api/skills', route =>
     route.request().method() === 'POST'
@@ -53,14 +53,16 @@ test('UX-007: Add Asset supports autofocus, Escape, Enter and human-readable err
   )
 
   await page.goto('/skills')
-  await page.getByRole('button', { name: 'Add Asset' }).click()
-  const input = page.getByPlaceholder('owner/repo, GitHub URL, or local path')
+  await page.getByRole('button', { name: 'Install new Skill' }).click()
+  await expect(page.getByRole('dialog')).toContainText('adds its Skills to this catalog')
+  await expect(page.getByRole('dialog')).toContainText('installs them globally')
+  const input = page.getByLabel('Skill source')
   await expect(input).toBeFocused()
   await page.keyboard.press('Escape')
   await expect(input).toBeHidden()
 
-  await page.getByRole('button', { name: 'Add Asset' }).click()
-  await page.getByPlaceholder('owner/repo, GitHub URL, or local path').fill('missing/repo')
+  await page.getByRole('button', { name: 'Install new Skill' }).click()
+  await page.getByLabel('Skill source').fill('missing/repo')
   await page.keyboard.press('Enter')
   await expect(page.getByRole('alert')).toContainText('Repository not found')
   await expect(page.getByRole('alert')).not.toContainText('422')

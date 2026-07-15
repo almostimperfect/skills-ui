@@ -1,14 +1,23 @@
-import { Router } from 'express'
-import { SkillsCliError } from '../../core/skills-cli.js'
+import { Router, type Response } from 'express'
 import { getActionAgentsForStatus, buildProjectSkillStatus, buildSkillStatusMap } from '../../core/status.js'
 import { createProjectRegistry } from '../../core/projects.js'
 import { createInventoryManager } from '../../core/inventory.js'
 import { getSkillMaintenance } from '../../core/maintenance.js'
 import { ARCHIVE_DIR, CONFIG_PATH, INVENTORY_PATH, SUPPORTED_AGENTS } from '../../core/constants.js'
 import { normalizeAgentId } from '../../core/agents.js'
+import { safeOperationalError } from '../safe-errors.js'
 
 function isAmbiguousSkillError(err: unknown): boolean {
   return err instanceof Error && err.message.includes('ambiguous')
+}
+
+function sendSafeError(res: Response, err: unknown, cliStatus = 422): void {
+  const safe = safeOperationalError(err, cliStatus)
+  res.status(safe.status).json({ error: safe.message })
+}
+
+function sendAmbiguousError(res: Response): void {
+  res.status(409).json({ error: 'The Skill reference is ambiguous. Use its catalog ID.' })
 }
 
 export function skillsRouter(): Router {
@@ -21,11 +30,7 @@ export function skillsRouter(): Router {
       const projects = await registry.listProjects()
       res.json(await inventory.listSkills(projects))
     } catch (err) {
-      if (err instanceof SkillsCliError) {
-        res.status(503).json({ error: err.message })
-      } else {
-        res.status(500).json({ error: 'Internal error' })
-      }
+      sendSafeError(res, err, 503)
     }
   })
 
@@ -41,7 +46,7 @@ export function skillsRouter(): Router {
       res.json({ ...skill, status })
     } catch (err) {
       if (isAmbiguousSkillError(err)) {
-        res.status(409).json({ error: err instanceof Error ? err.message : 'Ambiguous skill reference' })
+        sendAmbiguousError(res)
       } else {
         res.status(500).json({ error: 'Internal error' })
       }
@@ -59,7 +64,7 @@ export function skillsRouter(): Router {
       res.json(await getSkillMaintenance(skill, projects))
     } catch (err) {
       if (isAmbiguousSkillError(err)) {
-        res.status(409).json({ error: err instanceof Error ? err.message : 'Ambiguous skill reference' })
+        sendAmbiguousError(res)
       } else {
         res.status(500).json({ error: 'Internal error' })
       }
@@ -79,14 +84,10 @@ export function skillsRouter(): Router {
       res.status(201).json({ ok: true })
     } catch (err) {
       if (isAmbiguousSkillError(err)) {
-        res.status(409).json({ error: err instanceof Error ? err.message : 'Ambiguous skill reference' })
+        sendAmbiguousError(res)
         return
       }
-      if (err instanceof SkillsCliError) {
-        res.status(422).json({ error: err.message })
-      } else {
-        res.status(500).json({ error: 'Internal error' })
-      }
+      sendSafeError(res, err)
     }
   })
 
@@ -103,14 +104,10 @@ export function skillsRouter(): Router {
       res.status(204).send()
     } catch (err) {
       if (isAmbiguousSkillError(err)) {
-        res.status(409).json({ error: err instanceof Error ? err.message : 'Ambiguous skill reference' })
+        sendAmbiguousError(res)
         return
       }
-      if (err instanceof SkillsCliError) {
-        res.status(422).json({ error: err.message })
-      } else {
-        res.status(500).json({ error: 'Internal error' })
-      }
+      sendSafeError(res, err)
     }
   })
 
@@ -127,14 +124,10 @@ export function skillsRouter(): Router {
       res.json({ ok: true })
     } catch (err) {
       if (isAmbiguousSkillError(err)) {
-        res.status(409).json({ error: err instanceof Error ? err.message : 'Ambiguous skill reference' })
+        sendAmbiguousError(res)
         return
       }
-      if (err instanceof SkillsCliError) {
-        res.status(422).json({ error: err.message })
-      } else {
-        res.status(500).json({ error: err instanceof Error ? err.message : 'Internal error' })
-      }
+      sendSafeError(res, err)
     }
   })
 
@@ -155,14 +148,10 @@ export function skillsRouter(): Router {
       res.json({ ok: true })
     } catch (err) {
       if (isAmbiguousSkillError(err)) {
-        res.status(409).json({ error: err instanceof Error ? err.message : 'Ambiguous skill reference' })
+        sendAmbiguousError(res)
         return
       }
-      if (err instanceof SkillsCliError) {
-        res.status(422).json({ error: err.message })
-      } else {
-        res.status(500).json({ error: err instanceof Error ? err.message : 'Internal error' })
-      }
+      sendSafeError(res, err)
     }
   })
 
@@ -200,14 +189,10 @@ export function skillsRouter(): Router {
       res.json({ ok: true })
     } catch (err) {
       if (isAmbiguousSkillError(err)) {
-        res.status(409).json({ error: err instanceof Error ? err.message : 'Ambiguous skill reference' })
+        sendAmbiguousError(res)
         return
       }
-      if (err instanceof SkillsCliError) {
-        res.status(422).json({ error: err.message })
-      } else {
-        res.status(500).json({ error: err instanceof Error ? err.message : 'Internal error' })
-      }
+      sendSafeError(res, err)
     }
   })
 
@@ -246,14 +231,10 @@ export function skillsRouter(): Router {
       res.json({ ok: true })
     } catch (err) {
       if (isAmbiguousSkillError(err)) {
-        res.status(409).json({ error: err instanceof Error ? err.message : 'Ambiguous skill reference' })
+        sendAmbiguousError(res)
         return
       }
-      if (err instanceof SkillsCliError) {
-        res.status(422).json({ error: err.message })
-      } else {
-        res.status(500).json({ error: err instanceof Error ? err.message : 'Internal error' })
-      }
+      sendSafeError(res, err)
     }
   })
 
@@ -273,14 +254,10 @@ export function skillsRouter(): Router {
       res.json({ ok: true })
     } catch (err) {
       if (isAmbiguousSkillError(err)) {
-        res.status(409).json({ error: err instanceof Error ? err.message : 'Ambiguous skill reference' })
+        sendAmbiguousError(res)
         return
       }
-      if (err instanceof SkillsCliError) {
-        res.status(422).json({ error: err.message })
-      } else {
-        res.status(500).json({ error: err instanceof Error ? err.message : 'Internal error' })
-      }
+      sendSafeError(res, err)
     }
   })
 

@@ -34,6 +34,7 @@ function counts(skill: Skill) {
 
 export default function Skills() {
   const [showAdd, setShowAdd] = useState(false)
+  const [installSuccess, setInstallSuccess] = useState('')
   const [search, setSearch] = useState('')
   const qc = useQueryClient()
   const { data: skills, isLoading, error } = useQuery({ queryKey: ['skills'], queryFn: getSkills })
@@ -80,8 +81,8 @@ export default function Skills() {
     <div className="mx-auto max-w-7xl p-4 sm:p-6 lg:p-8">
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Skill assets</p>
-          <h1 className="mt-1 text-2xl font-semibold tracking-tight text-slate-950">Assets</h1>
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Skill catalog</p>
+          <h1 className="mt-1 text-2xl font-semibold tracking-tight text-slate-950">Skills</h1>
           <p className="mt-2 max-w-2xl text-sm text-slate-600">
             Known skills stay in the catalog even when every installation is removed.
           </p>
@@ -90,7 +91,7 @@ export default function Skills() {
           onClick={() => setShowAdd(true)}
           className="w-full rounded-md bg-slate-950 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 sm:w-auto"
         >
-          Add Asset
+          Install new Skill
         </button>
       </div>
 
@@ -138,7 +139,7 @@ export default function Skills() {
           type="text"
           value={search}
           onChange={e => setSearch(e.target.value)}
-          placeholder="Search assets, descriptions, or sources..."
+          placeholder="Search Skills, descriptions, or sources..."
           className="mb-3 w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-400"
         />
         <div className="flex flex-wrap gap-2">
@@ -163,7 +164,8 @@ export default function Skills() {
         </div>
       </div>
 
-      {isLoading && <p className="text-sm text-slate-500">Loading assets...</p>}
+      {isLoading && <p className="text-sm text-slate-500">Loading Skills...</p>}
+      {installSuccess && <p role="status" className="mb-4 rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{installSuccess}</p>}
       {error && (
         <div role="alert" className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
           Failed to load skill assets. Reconcile may be blocked by a missing project or skills CLI error.
@@ -233,11 +235,16 @@ export default function Skills() {
           </div>
         ))}
         {filtered?.length === 0 && (
-          <p className="py-10 text-center text-sm text-slate-400">No assets found</p>
+          <p className="py-10 text-center text-sm text-slate-400">No Skills found</p>
         )}
       </div>
 
-      {showAdd && <AddSkillDialog onClose={() => setShowAdd(false)} />}
+      {showAdd && (
+        <AddSkillDialog
+          onClose={() => setShowAdd(false)}
+          onInstalled={() => setInstallSuccess('The new Skill source was added to the catalog and installed globally.')}
+        />
+      )}
     </div>
   )
 }

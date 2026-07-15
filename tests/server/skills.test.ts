@@ -2,6 +2,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import request from 'supertest'
 
+const { MockSkillsCliError } = vi.hoisted(() => ({
+  MockSkillsCliError: class MockSkillsCliError extends Error {},
+}))
+
 const mockRegistryInstance = {
   listProjects: vi.fn().mockResolvedValue([]),
   getProject: vi.fn().mockResolvedValue(undefined),
@@ -28,7 +32,7 @@ const mockInventoryInstance = {
 const mockGetSkillMaintenance = vi.fn()
 
 vi.mock('../../src/core/skills-cli.js', () => ({
-  SkillsCliError: class SkillsCliError extends Error {},
+  SkillsCliError: MockSkillsCliError,
 }))
 vi.mock('../../src/core/projects.js', () => ({
   createProjectRegistry: vi.fn(() => mockRegistryInstance),
@@ -84,6 +88,22 @@ describe('POST /api/skills', () => {
     const app = createApp()
     const res = await request(app).post('/api/skills').send({})
     expect(res.status).toBe(400)
+  })
+
+  it('does not expose CLI commands, host paths, or tokens in source errors', async () => {
+    mockInventoryInstance.addGlobalSkillFromSource.mockRejectedValue(new MockSkillsCliError(
+      'skills add owner/private --global failed at /synthetic/private-host/path token=synthetic-secret'
+    ))
+
+    const app = createApp()
+    const res = await request(app).post('/api/skills').send({ source: 'owner/private' })
+    const body = JSON.stringify(res.body)
+
+    expect(res.status).toBe(422)
+    expect(res.body.error).toBe('The Skill source could not be installed. Check the repository and network connection.')
+    expect(body).not.toContain('skills add')
+    expect(body).not.toContain('/synthetic/private-host')
+    expect(body).not.toContain('synthetic-secret')
   })
 })
 

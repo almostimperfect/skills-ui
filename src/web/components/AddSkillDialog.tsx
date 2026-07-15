@@ -4,15 +4,17 @@ import { addSkill } from '../api.js'
 
 interface Props {
   onClose: () => void
+  onInstalled?: () => void
 }
 
-export default function AddSkillDialog({ onClose }: Props) {
+export default function AddSkillDialog({ onClose, onInstalled }: Props) {
   const [source, setSource] = useState('')
   const qc = useQueryClient()
   const mutation = useMutation({
     mutationFn: () => addSkill(source),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['skills'] })
+      onInstalled?.()
       onClose()
     },
   })
@@ -34,15 +36,21 @@ export default function AddSkillDialog({ onClose }: Props) {
           if (source && !mutation.isPending) mutation.mutate()
         }}
       >
-        <h2 id="add-skill-title" className="text-lg font-semibold text-gray-900 mb-4">Add Skill</h2>
+        <h2 id="add-skill-title" className="text-lg font-semibold text-gray-900">Install new Skill</h2>
+        <p className="mt-2 text-sm leading-6 text-slate-600">
+          Discovers the source, adds its Skills to this catalog, and installs them globally to the enabled Global targets.
+        </p>
+        <label htmlFor="skill-source" className="mt-4 block text-sm font-medium text-slate-800">Skill source</label>
         <input
+          id="skill-source"
           autoFocus
           type="text"
           value={source}
           onChange={e => setSource(e.target.value)}
           placeholder="owner/repo, GitHub URL, or local path"
-          className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          className="mt-1 w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
         />
+        <p className="mt-1 text-xs text-slate-500">Examples: owner/repo, a GitHub URL, or an absolute local path.</p>
         {mutation.error && (
           <p role="alert" className="text-red-600 text-sm mt-2">{(mutation.error as Error).message}</p>
         )}

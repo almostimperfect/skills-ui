@@ -1,11 +1,13 @@
-import { useParams, Link } from 'react-router-dom'
+import { useEffect } from 'react'
+import { useParams, Link, useNavigate } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ApiError, getSkill, getSkillMaintenance, installGlobalSkill, splitGlobalSkill, updateSkill } from '../api.js'
-import AgentToggle from '../components/AgentToggle.js'
+import AgentSkillControl from '../components/AgentSkillControl.js'
 
 export default function SkillDetail() {
   const { name: encodedSkillId } = useParams<{ name: string }>()
   const skillId = encodedSkillId ?? ''
+  const navigate = useNavigate()
   const qc = useQueryClient()
   const { data: skill, isLoading, error } = useQuery({
     queryKey: ['skill', skillId],
@@ -48,6 +50,12 @@ export default function SkillDetail() {
       ])
     },
   })
+
+  useEffect(() => {
+    if (skill && skillId && skill.id !== skillId) {
+      navigate(`/skills/${encodeURIComponent(skill.id)}`, { replace: true })
+    }
+  }, [navigate, skill, skillId])
 
   if (isLoading) return <div className="p-8 text-gray-500">Loading...</div>
   if (error instanceof ApiError && error.status === 404) return <div className="p-8 text-red-600">Skill not found</div>
@@ -270,9 +278,11 @@ export default function SkillDetail() {
                   <td className="px-4 py-3 text-slate-700">{projectPath.split('/').pop()}</td>
                   {Object.entries(skill.status[projectPath] ?? {}).map(([agent, status]) => (
                     <td key={agent} className="px-4 py-3 text-center">
-                      <AgentToggle
+                      <AgentSkillControl
                         skillId={skill.id}
+                        skillName={skill.name}
                         projectPath={projectPath}
+                        projectName={projectPath.split(/[\\/]/).filter(Boolean).pop()}
                         agent={agent}
                         status={status ?? {
                           state: 'unavailable',

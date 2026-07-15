@@ -129,7 +129,81 @@ test('UX-001: an unknown asset renders a not-found state', async ({ page }) => {
   await expect(page.getByText('Skill not found', { exact: true })).toBeVisible()
 })
 
-test('UX-009: a failed agent toggle renders feedback', async ({ page }) => {
+test('catalog continuity: an alias detail URL is replaced with the canonical Skill id', async ({ page }) => {
+  const canonicalSkill = {
+    ...skill,
+    id: 'canonical-id',
+    aliases: ['old-id'],
+    status: {},
+  }
+  await page.route('**/api/skills/*/maintenance', route => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify({
+      update: { supported: false, status: 'unsupported', checkedAt: '2026-07-15T00:00:00.000Z' },
+      modifiedProjects: [],
+    }),
+  }))
+  await page.route('**/api/skills/*', route => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify(canonicalSkill),
+  }))
+
+  await page.goto('/skills/old-id')
+
+  await expect(page).toHaveURL(/\/skills\/canonical-id$/)
+  await expect(page.getByRole('heading', { name: 'basic-skill' })).toBeVisible()
+})
+
+test('project Skill state is inert and removal is an explicit confirmed action', async ({ page }) => {
+  let disableRequests = 0
+  await page.route('**/api/projects/**', route => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify({
+      ...project,
+      skills: [{
+        ...skill,
+        instances: [{ scope: 'project', path: `${projectPath}/.agents/skills/basic-skill`, agents: ['Codex', 'Gemini CLI'] }],
+        status: {
+          codex: {
+            state: 'project',
+            canEnable: false,
+            canDisable: true,
+            sharedWith: ['gemini-cli'],
+          },
+        },
+      }],
+    }),
+  }))
+  await page.route('**/api/skills/basic-skill-id/disable', route => {
+    disableRequests += 1
+    return route.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true}' })
+  })
+
+  await page.goto(`/projects/${encodeURIComponent(projectPath)}`)
+  await page.locator('tbody').getByText('Project install', { exact: true }).click()
+  await page.waitForTimeout(200)
+  expect(disableRequests).toBe(0)
+
+  page.once('dialog', async dialog => {
+    expect(dialog.message()).toContain('basic-skill')
+    expect(dialog.message()).toContain('app')
+    expect(dialog.message()).toContain('codex')
+    expect(dialog.message()).toContain('gemini-cli')
+    expect(dialog.message()).toContain('catalog')
+    await dialog.dismiss()
+  })
+  await page.getByRole('button', { name: 'Remove from project' }).click()
+  expect(disableRequests).toBe(0)
+
+  page.once('dialog', dialog => dialog.accept())
+  await page.getByRole('button', { name: 'Remove from project' }).click()
+  await expect.poll(() => disableRequests).toBe(1)
+})
+
+test('UX-009: a failed explicit project removal renders feedback', async ({ page }) => {
   await page.route('**/api/projects/**', route => route.fulfill({
     status: 200,
     contentType: 'application/json',
@@ -149,7 +223,8 @@ test('UX-009: a failed agent toggle renders feedback', async ({ page }) => {
   }))
 
   await page.goto(`/projects/${encodeURIComponent(projectPath)}`)
-  await page.getByTitle(/Project install for codex/).click()
+  page.once('dialog', dialog => dialog.accept())
+  await page.getByRole('button', { name: 'Remove from project' }).click()
   await expect(page.getByRole('alert')).toContainText(/failed|disk failure/i)
 })
 

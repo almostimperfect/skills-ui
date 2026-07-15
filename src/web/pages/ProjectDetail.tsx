@@ -1,7 +1,7 @@
 import { useParams, Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { getProject, enableSkill, disableSkill, type AgentSkillStatus, type ProjectWithMatrix } from '../api.js'
-import AgentToggle from '../components/AgentToggle.js'
+import AgentSkillControl from '../components/AgentSkillControl.js'
 
 const UNIVERSAL_PROJECT_AGENTS = new Set(['codex', 'gemini-cli'])
 
@@ -153,9 +153,11 @@ export default function ProjectDetail() {
                   </td>
                   {project.agents.map(agent => (
                     <td key={agent} className="px-4 py-3 text-center">
-                      <AgentToggle
+                      <AgentSkillControl
                         skillId={skill.id}
+                        skillName={skill.name}
                         projectPath={projectPath}
+                        projectName={project.name}
                         agent={agent}
                         status={skill.status[agent] ?? {
                           state: 'unavailable',

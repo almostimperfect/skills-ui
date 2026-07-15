@@ -1,5 +1,8 @@
 import { Command } from 'commander'
-import { addSkill, SkillsCliError } from '../../core/skills-cli.js'
+import { SkillsCliError } from '../../core/skills-cli.js'
+import { createProjectRegistry } from '../../core/projects.js'
+import { createInventoryManager } from '../../core/inventory.js'
+import { ARCHIVE_DIR, CONFIG_PATH, INVENTORY_PATH } from '../../core/constants.js'
 
 export function addCommand(): Command {
   return new Command('add')
@@ -8,7 +11,10 @@ export function addCommand(): Command {
     .action(async (source: string) => {
       try {
         console.log(`Installing ${source}...`)
-        await addSkill(source)
+        const registry = createProjectRegistry(CONFIG_PATH)
+        const projects = await registry.listProjects()
+        const globalAgents = await registry.getGlobalAgents()
+        await createInventoryManager(INVENTORY_PATH, ARCHIVE_DIR).addGlobalSkillFromSource(source, projects, globalAgents)
         console.log(`✓ Installed ${source}`)
       } catch (err) {
         if (err instanceof SkillsCliError) {

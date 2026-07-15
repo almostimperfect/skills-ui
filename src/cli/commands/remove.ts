@@ -1,23 +1,27 @@
 import { Command } from 'commander'
-import { removeSkill, SkillsCliError } from '../../core/skills-cli.js'
-import { createStateManager } from '../../core/state.js'
-import { STATE_PATH } from '../../core/constants.js'
+import { createProjectRegistry } from '../../core/projects.js'
+import { createInventoryManager } from '../../core/inventory.js'
+import { ARCHIVE_DIR, CONFIG_PATH, INVENTORY_PATH } from '../../core/constants.js'
 
 export function removeCommand(): Command {
   return new Command('remove')
-    .argument('<name>', 'Skill name to remove')
-    .description('Uninstall a skill')
-    .action(async (name: string) => {
+    .argument('<ref>', 'Skill ID or unique skill name to remove')
+    .description('Remove a managed global skill')
+    .action(async (ref: string) => {
       try {
-        await removeSkill(name)
-        await createStateManager(STATE_PATH).cleanupSkill(name)
-        console.log(`✓ Removed ${name}`)
-      } catch (err) {
-        if (err instanceof SkillsCliError) {
-          console.error(`Error: ${err.message}`)
-          process.exit(1)
+        const registry = createProjectRegistry(CONFIG_PATH)
+        const inventory = createInventoryManager(INVENTORY_PATH, ARCHIVE_DIR)
+        const projects = await registry.listProjects()
+        const skill = await inventory.resolveSkillRef(ref, projects)
+        if (!skill) {
+          throw new Error(`Skill not found: ${ref}`)
         }
-        throw err
+        await inventory.removeGlobalSkill(skill.id, projects)
+        await inventory.reconcile(projects)
+        console.log(`✓ Removed ${skill.name}`)
+      } catch (err: unknown) {
+        console.error(`Error: ${err instanceof Error ? err.message : String(err)}`)
+        process.exit(1)
       }
     })
 }

@@ -1,20 +1,34 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
-import { getProjects, registerProject, unregisterProject } from '../api.js'
+import { getAgents, getProjects, registerProject, unregisterProject, updateProject } from '../api.js'
 
 export default function Projects() {
   const [showAdd, setShowAdd] = useState(false)
   const [newPath, setNewPath] = useState('')
+  const [newAgents, setNewAgents] = useState<string[]>(['codex'])
   const qc = useQueryClient()
   const { data: projects, isLoading } = useQuery({ queryKey: ['projects'], queryFn: getProjects })
+  const { data: supportedAgents } = useQuery({ queryKey: ['agents'], queryFn: getAgents })
 
   const addMutation = useMutation({
-    mutationFn: () => registerProject(newPath),
+    mutationFn: () => registerProject(newPath, newAgents),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['projects'] })
       setShowAdd(false)
       setNewPath('')
+      setNewAgents(['codex'])
+    },
+  })
+
+  const updateAgentsMutation = useMutation({
+    mutationFn: ({ path, agents }: { path: string; agents: string[] }) => updateProject(path, { agents }),
+    onSuccess: async () => {
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ['projects'] }),
+        qc.invalidateQueries({ queryKey: ['project'] }),
+        qc.invalidateQueries({ queryKey: ['skills'] }),
+      ])
     },
   })
 
@@ -36,27 +50,73 @@ export default function Projects() {
       </div>
 
       {showAdd && (
-        <div className="bg-white rounded-lg border border-gray-200 p-4 mb-4">
+        <form
+          className="bg-white rounded-lg border border-gray-200 p-4 mb-4"
+          onSubmit={event => {
+            event.preventDefault()
+            if (newPath && !addMutation.isPending) addMutation.mutate()
+          }}
+          onKeyDown={event => {
+            if (event.key === 'Escape') setShowAdd(false)
+          }}
+        >
           <input
+            autoFocus
             type="text"
             value={newPath}
             onChange={e => setNewPath(e.target.value)}
             placeholder="/absolute/path/to/project"
             className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 mb-3"
           />
+          <div className="mb-3 flex flex-wrap gap-2">
+            {supportedAgents?.map(agent => {
+              const enabled = newAgents.includes(agent)
+              return (
+                <button
+                  type="button"
+                  key={agent}
+                  onClick={() => setNewAgents(enabled
+                    ? newAgents.filter(item => item !== agent)
+                    : [...newAgents, agent]
+                  )}
+                  disabled={enabled && newAgents.length === 1}
+                  className={`rounded-full border px-3 py-1 text-xs font-medium disabled:cursor-not-allowed disabled:opacity-50 ${
+                    enabled
+                      ? 'border-slate-900 bg-slate-950 text-white'
+                      : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                  }`}
+                >
+                  {agent}
+                </button>
+              )
+            })}
+          </div>
           <div className="flex gap-2">
             <button
-              onClick={() => addMutation.mutate()}
+              type="submit"
               disabled={!newPath || addMutation.isPending}
               className="px-3 py-1.5 text-sm bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:opacity-50"
             >
               {addMutation.isPending ? 'Adding...' : 'Add'}
             </button>
-            <button onClick={() => setShowAdd(false)} className="px-3 py-1.5 text-sm text-gray-600">
+            <button type="button" onClick={() => setShowAdd(false)} className="px-3 py-1.5 text-sm text-gray-600">
               Cancel
             </button>
           </div>
-        </div>
+          {addMutation.isError && (
+            <p role="alert" className="mt-3 text-sm text-red-700">
+              {addMutation.error instanceof Error ? addMutation.error.message : 'Failed to add project.'}
+            </p>
+          )}
+        </form>
+      )}
+
+      {(removeMutation.isError || updateAgentsMutation.isError) && (
+        <p role="alert" className="mb-4 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {(removeMutation.error ?? updateAgentsMutation.error) instanceof Error
+            ? (removeMutation.error ?? updateAgentsMutation.error as Error).message
+            : 'Failed to update the project.'}
+        </p>
       )}
 
       {isLoading && <p className="text-gray-500">Loading...</p>}
@@ -72,10 +132,34 @@ export default function Projects() {
                 {project.name}
               </Link>
               <p className="text-xs text-gray-400">{project.path}</p>
-              <p className="text-xs text-gray-500 mt-0.5">Agents: {project.agents.join(', ') || 'none'}</p>
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {supportedAgents?.map(agent => {
+                  const enabled = project.agents.includes(agent)
+                  const next = enabled
+                    ? project.agents.filter(item => item !== agent)
+                    : [...project.agents, agent]
+                  return (
+                    <button
+                      key={agent}
+                      onClick={() => updateAgentsMutation.mutate({ path: project.path, agents: next })}
+                      disabled={updateAgentsMutation.isPending || (enabled && project.agents.length === 1)}
+                      className={`rounded-full border px-2.5 py-0.5 text-xs font-medium disabled:cursor-not-allowed disabled:opacity-50 ${
+                        enabled
+                          ? 'border-slate-900 bg-slate-950 text-white'
+                          : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50'
+                      }`}
+                    >
+                      {agent}
+                    </button>
+                  )
+                })}
+              </div>
             </div>
             <button
-              onClick={() => removeMutation.mutate(project.path)}
+              onClick={() => {
+                if (!window.confirm(`Remove ${project.name} from managed projects?`)) return
+                removeMutation.mutate(project.path)
+              }}
               className="text-sm text-red-600 hover:text-red-800"
             >
               Remove

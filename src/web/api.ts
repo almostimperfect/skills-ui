@@ -1,21 +1,82 @@
 const BASE = '/api'
 
-async function json<T>(res: Response): Promise<T> {
-  if (!res.ok) {
-    const body = await res.text()
-    throw new Error(`${res.status} ${res.statusText}: ${body}`)
+export class ApiError extends Error {
+  constructor(public readonly status: number, message: string) {
+    super(message)
+    this.name = 'ApiError'
   }
+}
+
+async function errorMessage(res: Response): Promise<string> {
+  const body = await res.text()
+  if (body) {
+    try {
+      const parsed = JSON.parse(body) as { error?: unknown }
+      if (typeof parsed.error === 'string' && parsed.error.trim()) return parsed.error
+    } catch {
+      // Plain text responses are already suitable user-facing fallbacks.
+    }
+    if (body.trim()) return body.trim()
+  }
+  return res.statusText || 'Request failed'
+}
+
+async function expectOk(res: Response): Promise<void> {
+  if (!res.ok) throw new ApiError(res.status, await errorMessage(res))
+}
+
+async function json<T>(res: Response): Promise<T> {
+  await expectOk(res)
   return res.json() as Promise<T>
 }
 
 export interface Skill {
+  id: string
   name: string
   description: string
   source: string
+  reinstallable?: boolean
+  instances?: Array<{
+    scope: 'global' | 'project'
+    path: string
+    agents: string[]
+    projectPath?: string
+  }>
+}
+
+export type SkillState = 'project' | 'global' | 'available' | 'unavailable'
+
+export interface AgentSkillStatus {
+  state: SkillState
+  canEnable: boolean
+  canDisable: boolean
+  reason?: string
+  sharedWith?: string[]
+}
+
+export type SkillUpdateStatus = 'up-to-date' | 'update-available' | 'unsupported' | 'error'
+
+export interface SkillUpdateInfo {
+  supported: boolean
+  status: SkillUpdateStatus
+  reason?: string
+  installedAt?: string
+  updatedAt?: string
+  checkedAt: string
+}
+
+export interface SkillDriftInfo {
+  projectPath: string
+  paths: string[]
+}
+
+export interface SkillMaintenance {
+  update: SkillUpdateInfo
+  modifiedProjects: SkillDriftInfo[]
 }
 
 export interface SkillWithStatus extends Skill {
-  status: Record<string, Record<string, 'enabled' | 'disabled'>>
+  status: Record<string, Record<string, AgentSkillStatus>>
 }
 
 export interface Project {
@@ -25,15 +86,22 @@ export interface Project {
 }
 
 export interface ProjectWithMatrix extends Project {
-  matrix: Record<string, Record<string, 'enabled' | 'disabled'>>
+  skills: Array<Skill & {
+    status: Record<string, AgentSkillStatus>
+  }>
+}
+
+export interface GlobalAgentConfig {
+  supported: string[]
+  enabled: string[]
 }
 
 // Skills
 export const getSkills = () =>
   fetch(`${BASE}/skills`).then(r => json<Skill[]>(r))
 
-export const getSkill = (name: string) =>
-  fetch(`${BASE}/skills/${encodeURIComponent(name)}`).then(r => json<SkillWithStatus>(r))
+export const getSkill = (id: string) =>
+  fetch(`${BASE}/skills/${encodeURIComponent(id)}`).then(r => json<SkillWithStatus>(r))
 
 export const addSkill = (source: string) =>
   fetch(`${BASE}/skills`, {
@@ -42,23 +110,39 @@ export const addSkill = (source: string) =>
     body: JSON.stringify({ source }),
   }).then(r => json<{ ok: boolean }>(r))
 
-export const removeSkill = (name: string) =>
-  fetch(`${BASE}/skills/${encodeURIComponent(name)}`, { method: 'DELETE' }).then(r => {
-    if (!r.ok) throw new Error(`Failed to remove skill: ${r.status}`)
-  })
+export const removeSkill = (id: string) =>
+  fetch(`${BASE}/skills/${encodeURIComponent(id)}`, { method: 'DELETE' }).then(expectOk)
 
-export const enableSkill = (name: string, projectPath: string, agent: string) =>
-  fetch(`${BASE}/skills/${encodeURIComponent(name)}/enable`, {
+export const enableSkill = (id: string, projectPath: string, agent: string) =>
+  fetch(`${BASE}/skills/${encodeURIComponent(id)}/enable`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ projectPath, agent }),
   }).then(r => json<{ ok: boolean }>(r))
 
-export const disableSkill = (name: string, projectPath: string, agent: string) =>
-  fetch(`${BASE}/skills/${encodeURIComponent(name)}/disable`, {
+export const disableSkill = (id: string, projectPath: string, agent: string) =>
+  fetch(`${BASE}/skills/${encodeURIComponent(id)}/disable`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ projectPath, agent }),
+  }).then(r => json<{ ok: boolean }>(r))
+
+export const splitGlobalSkill = (id: string) =>
+  fetch(`${BASE}/skills/${encodeURIComponent(id)}/split-global`, {
+    method: 'POST',
+  }).then(r => json<{ ok: boolean }>(r))
+
+export const getSkillMaintenance = (id: string) =>
+  fetch(`${BASE}/skills/${encodeURIComponent(id)}/maintenance`).then(r => json<SkillMaintenance>(r))
+
+export const updateSkill = (id: string) =>
+  fetch(`${BASE}/skills/${encodeURIComponent(id)}/update`, {
+    method: 'POST',
+  }).then(r => json<{ ok: boolean }>(r))
+
+export const installGlobalSkill = (id: string) =>
+  fetch(`${BASE}/skills/${encodeURIComponent(id)}/install-global`, {
+    method: 'POST',
   }).then(r => json<{ ok: boolean }>(r))
 
 // Projects
@@ -85,10 +169,18 @@ export const updateProject = (projectPath: string, updates: { name?: string; age
   }).then(r => json<Project>(r))
 
 export const unregisterProject = (projectPath: string) =>
-  fetch(`${BASE}/projects/${encodeURIComponent(projectPath)}`, { method: 'DELETE' }).then(r => {
-    if (!r.ok) throw new Error(`Failed to unregister project: ${r.status}`)
-  })
+  fetch(`${BASE}/projects/${encodeURIComponent(projectPath)}`, { method: 'DELETE' }).then(expectOk)
 
 // Agents
 export const getAgents = () =>
   fetch(`${BASE}/agents`).then(r => json<string[]>(r))
+
+export const getGlobalAgents = () =>
+  fetch(`${BASE}/agents/global`).then(r => json<GlobalAgentConfig>(r))
+
+export const updateGlobalAgents = (agents: string[]) =>
+  fetch(`${BASE}/agents/global`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ agents }),
+  }).then(r => json<GlobalAgentConfig>(r))

@@ -9,11 +9,12 @@ export async function parseSkillMetadata(skillDir: string, dirName: string): Pro
     const raw = await readFile(skillMdPath, 'utf-8')
     const { data } = matter(raw)
     return {
+      id: dirName,
       name: (data.name as string) || dirName,
       description: (data.description as string) || '',
       source: (data.source as string) || '',
     }
   } catch {
-    return { name: dirName, description: '', source: '' }
+    return { id: dirName, name: dirName, description: '', source: '' }
   }
 }

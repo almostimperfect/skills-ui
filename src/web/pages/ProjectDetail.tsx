@@ -1,7 +1,50 @@
 import { useParams, Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { getProject, enableSkill, disableSkill } from '../api.js'
+import { getProject, enableSkill, disableSkill, type AgentSkillStatus, type ProjectWithMatrix } from '../api.js'
 import AgentToggle from '../components/AgentToggle.js'
+
+const UNIVERSAL_PROJECT_AGENTS = new Set(['codex', 'gemini-cli'])
+
+function uniqueProjectActions(
+  project: ProjectWithMatrix,
+  action: 'enable' | 'disable',
+  projectPath: string
+): Array<Promise<unknown>> {
+  const seen = new Set<string>()
+  const requests: Array<Promise<unknown>> = []
+
+  for (const skill of project.skills) {
+    const agents = action === 'enable'
+      ? (() => {
+          const exclusiveAgents = project.agents.filter(agent =>
+            !UNIVERSAL_PROJECT_AGENTS.has(agent) && skill.status[agent]?.canEnable
+          )
+          return exclusiveAgents.length > 0
+            ? exclusiveAgents
+            : project.agents.filter(agent => skill.status[agent]?.canEnable)
+        })()
+      : project.agents.filter(agent => skill.status[agent]?.canDisable)
+
+    for (const agent of agents) {
+      const status = skill.status[agent] as AgentSkillStatus | undefined
+      const allowed = action === 'enable' ? status?.canEnable : status?.canDisable
+      if (!allowed) continue
+
+      const group = [agent, ...(status?.sharedWith ?? [])].sort()
+      const key = `${skill.id}:${action}:${group.join(',')}`
+      if (seen.has(key)) continue
+      seen.add(key)
+
+      requests.push(
+        action === 'enable'
+          ? enableSkill(skill.id, projectPath, agent)
+          : disableSkill(skill.id, projectPath, agent)
+      )
+    }
+  }
+
+  return requests
+}
 
 export default function ProjectDetail() {
   const { projectPath: encoded } = useParams<{ projectPath: string }>()
@@ -17,32 +60,18 @@ export default function ProjectDetail() {
 
   const enableAll = useMutation({
     mutationFn: async () => {
-      if (!project) return
-      await Promise.all(
-        Object.keys(project.matrix).flatMap(skillName =>
-          project.agents.map(agent =>
-            project.matrix[skillName][agent] === 'disabled'
-              ? enableSkill(skillName, projectPath, agent)
-              : Promise.resolve()
-          )
-        )
-      )
+      if (!project) return 0
+      const results = await Promise.allSettled(uniqueProjectActions(project, 'enable', projectPath))
+      return results.filter(result => result.status === 'rejected').length
     },
     onSuccess: () => qc.invalidateQueries({ queryKey }),
   })
 
   const disableAll = useMutation({
     mutationFn: async () => {
-      if (!project) return
-      await Promise.all(
-        Object.keys(project.matrix).flatMap(skillName =>
-          project.agents.map(agent =>
-            project.matrix[skillName][agent] === 'enabled'
-              ? disableSkill(skillName, projectPath, agent)
-              : Promise.resolve()
-          )
-        )
-      )
+      if (!project) return 0
+      const results = await Promise.allSettled(uniqueProjectActions(project, 'disable', projectPath))
+      return results.filter(result => result.status === 'rejected').length
     },
     onSuccess: () => qc.invalidateQueries({ queryKey }),
   })
@@ -50,64 +79,89 @@ export default function ProjectDetail() {
   if (isLoading) return <div className="p-8 text-gray-500">Loading...</div>
   if (error || !project) return <div className="p-8 text-red-600">Failed to load project</div>
 
-  const skillNames = Object.keys(project.matrix)
+  const skills = project.skills
 
   return (
-    <div className="p-8">
-      <Link to="/projects" className="text-sm text-indigo-600 hover:underline mb-4 inline-block">
+    <div className="mx-auto max-w-7xl p-4 sm:p-6 lg:p-8">
+      <Link to="/projects" className="mb-4 inline-block text-sm font-medium text-slate-600 hover:text-slate-950">
         ← Back to Projects
       </Link>
-      <h1 className="text-2xl font-bold text-gray-900 mb-1">{project.name}</h1>
-      <p className="text-xs text-gray-400 mb-6">{project.path}</p>
+      <h1 className="mb-1 text-2xl font-semibold tracking-tight text-slate-950">{project.name}</h1>
+      <p className="mb-6 break-all text-xs text-slate-400">{project.path}</p>
 
-      <div className="flex gap-2 mb-4">
+      <div className="mb-4 rounded-lg border border-slate-200 bg-white p-4">
+        <p className="text-sm font-medium text-slate-950">Project skill status</p>
+        <div className="mt-2 grid gap-2 text-xs text-slate-600 sm:grid-cols-2 lg:grid-cols-4">
+          <p><span className="font-medium text-slate-800">Project install</span>: installed directly in this project.</p>
+          <p><span className="font-medium text-slate-800">Global install</span>: inherited from a global install.</p>
+          <p><span className="font-medium text-slate-800">Can install</span>: asset is known and can be installed here.</p>
+          <p><span className="font-medium text-slate-800">No source</span>: asset exists, but cannot be reinstalled safely.</p>
+        </div>
+      </div>
+
+      <div className="mb-4 flex flex-wrap gap-2">
         <button
           onClick={() => enableAll.mutate()}
-          className="px-3 py-1.5 text-xs bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-md hover:bg-indigo-100"
+          disabled={enableAll.isPending || disableAll.isPending}
+          className="rounded-md border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-800 hover:bg-slate-50"
         >
-          Enable all
+          {enableAll.isPending ? 'Installing...' : 'Install all available'}
         </button>
         <button
           onClick={() => disableAll.mutate()}
-          className="px-3 py-1.5 text-xs bg-gray-50 text-gray-600 border border-gray-200 rounded-md hover:bg-gray-100"
+          disabled={enableAll.isPending || disableAll.isPending}
+          className="rounded-md border border-red-200 bg-white px-3 py-2 text-xs font-medium text-red-700 hover:bg-red-50"
         >
-          Disable all
+          {disableAll.isPending ? 'Uninstalling...' : 'Uninstall project installs'}
         </button>
       </div>
 
-      {skillNames.length === 0 ? (
-        <p className="text-gray-400 text-sm">No skills installed globally.</p>
+      {((enableAll.data ?? 0) > 0 || (disableAll.data ?? 0) > 0) && (
+        <p role="alert" className="mb-4 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {(enableAll.data ?? disableAll.data)} change{(enableAll.data ?? disableAll.data) === 1 ? '' : 's'} failed. Successful changes were preserved.
+        </p>
+      )}
+
+      {skills.length === 0 ? (
+        <p className="text-sm text-slate-400">No managed skills found.</p>
       ) : (
-        <div className="bg-white rounded-lg border border-gray-200 overflow-x-auto">
+        <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-gray-200 bg-gray-50">
-                <th className="text-left px-4 py-3 font-medium text-gray-600">Skill</th>
+              <tr className="border-b border-slate-200 bg-slate-50">
+                <th className="px-4 py-3 text-left font-medium text-slate-600">Skill asset</th>
                 {project.agents.map(agent => (
-                  <th key={agent} className="text-center px-4 py-3 font-medium text-gray-600">
+                  <th key={agent} className="px-4 py-3 text-center font-medium text-slate-600">
                     {agent}
                   </th>
                 ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
-              {skillNames.map(skillName => (
-                <tr key={skillName}>
+            <tbody className="divide-y divide-slate-100">
+              {skills.map(skill => (
+                <tr key={skill.id}>
                   <td className="px-4 py-3">
                     <Link
-                      to={`/skills/${encodeURIComponent(skillName)}`}
-                      className="text-indigo-600 hover:underline"
+                      to={`/skills/${encodeURIComponent(skill.id)}`}
+                      className="font-medium text-slate-950 hover:underline"
                     >
-                      {skillName}
+                      {skill.name}
                     </Link>
+                    {skill.description && (
+                      <p className="mt-1 line-clamp-2 max-w-lg text-xs leading-5 text-slate-500">{skill.description}</p>
+                    )}
                   </td>
                   {project.agents.map(agent => (
                     <td key={agent} className="px-4 py-3 text-center">
                       <AgentToggle
-                        skillName={skillName}
+                        skillId={skill.id}
                         projectPath={projectPath}
                         agent={agent}
-                        status={project.matrix[skillName][agent] ?? 'enabled'}
+                        status={skill.status[agent] ?? {
+                          state: 'unavailable',
+                          canEnable: false,
+                          canDisable: false,
+                        }}
                         invalidateKey={queryKey}
                       />
                     </td>

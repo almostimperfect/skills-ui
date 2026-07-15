@@ -16,6 +16,17 @@ dist/
 # Test coverage
 coverage/
 
+# Local manual QA fixtures
+.xtest/
+
+# Browser test artifacts
+.playwright-mcp/
+playwright-report/
+test-results/
+
+# Local scratch space
+temp/
+
 # Logs
 *.log
 npm-debug.log*
@@ -34,6 +45,8 @@ yarn-error.log*
 .worktrees/
 
 # AI coding tool configs (personal, local)
+.skills-ui/
+docs/superpowers/
 .claude/
 .superpowers/
 .gemini/
@@ -44,5 +57,5 @@ yarn-error.log*
 .continue/
 .agent/
 .agents/
+.skill-lock.json
 skills-lock.json
-

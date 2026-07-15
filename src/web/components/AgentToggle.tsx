@@ -1,40 +1,80 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { enableSkill, disableSkill } from '../api.js'
+import { enableSkill, disableSkill, type AgentSkillStatus } from '../api.js'
 
 interface Props {
-  skillName: string
+  skillId: string
   projectPath: string
   agent: string
-  status: 'enabled' | 'disabled'
+  status: AgentSkillStatus
   invalidateKey: unknown[]
 }
 
-export default function AgentToggle({ skillName, projectPath, agent, status, invalidateKey }: Props) {
+export default function AgentToggle({ skillId, projectPath, agent, status, invalidateKey }: Props) {
   const qc = useQueryClient()
   const toggle = useMutation({
     mutationFn: () =>
-      status === 'enabled'
-        ? disableSkill(skillName, projectPath, agent)
-        : enableSkill(skillName, projectPath, agent),
-    onSuccess: () => qc.invalidateQueries({ queryKey: invalidateKey }),
+      status.canDisable
+        ? disableSkill(skillId, projectPath, agent)
+        : enableSkill(skillId, projectPath, agent),
+    onSuccess: async () => {
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: invalidateKey }),
+        qc.invalidateQueries({ queryKey: ['skills'] }),
+        qc.invalidateQueries({ queryKey: ['skill'] }),
+        qc.invalidateQueries({ queryKey: ['project'] }),
+      ])
+    },
   })
 
-  const enabled = status === 'enabled'
+  const interactive = status.canEnable || status.canDisable
+  const active = status.state === 'project' || status.state === 'global'
+  const label =
+    status.state === 'project'
+      ? 'Project install'
+      : status.state === 'global'
+        ? 'Global install'
+        : status.state === 'available'
+          ? 'Can install'
+          : 'No source'
+  const actionHint =
+    status.state === 'project'
+      ? 'Installed directly in this project. Click to uninstall from this project.'
+      : status.state === 'global'
+        ? 'Available here because it is installed globally. Manage it from the skill asset.'
+        : status.state === 'available'
+          ? 'Known asset with a reinstall source. Click to install into this project.'
+          : 'Known asset, but skills-ui has no reinstall source for this target.'
+  const titleParts = [
+    `${label} for ${agent}`,
+    actionHint,
+    status.reason,
+    status.sharedWith?.length ? `Shared with: ${status.sharedWith.join(', ')}` : undefined,
+  ].filter(Boolean)
 
   return (
-    <button
-      onClick={() => toggle.mutate()}
-      disabled={toggle.isPending}
-      className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors disabled:opacity-50 ${
-        enabled ? 'bg-indigo-600' : 'bg-gray-300'
+    <div className="inline-flex flex-col items-center gap-1">
+      <button
+      onClick={() => {
+        if (!interactive || toggle.isPending) return
+        toggle.mutate()
+      }}
+      disabled={!interactive || toggle.isPending}
+      className={`inline-flex min-w-32 items-center justify-center rounded-full px-3 py-1 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
+        active
+          ? 'bg-indigo-50 text-indigo-700 border border-indigo-200'
+          : interactive
+            ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+            : 'bg-gray-100 text-gray-500 border border-gray-200'
       }`}
-      title={`${enabled ? 'Disable' : 'Enable'} for ${agent}`}
+      title={titleParts.join(' | ')}
     >
-      <span
-        className={`inline-block h-3.5 w-3.5 rounded-full bg-white shadow transform transition-transform ${
-          enabled ? 'translate-x-4' : 'translate-x-1'
-        }`}
-      />
-    </button>
+      {toggle.isPending ? 'Working...' : label}
+      </button>
+      {toggle.isError && (
+        <span role="alert" className="max-w-48 text-xs text-red-700">
+          {toggle.error instanceof Error ? toggle.error.message : 'Agent update failed.'}
+        </span>
+      )}
+    </div>
   )
 }

@@ -6,6 +6,9 @@ import { removeCommand } from './commands/remove.js'
 import { listCommand } from './commands/list.js'
 import { enableCommand } from './commands/enable.js'
 import { disableCommand } from './commands/disable.js'
+import { checkCommand } from './commands/check.js'
+import { updateCommand } from './commands/update.js'
+import { splitGlobalCommand } from './commands/split-global.js'
 import { projectsCommand } from './commands/projects.js'
 import { projectAddCommand } from './commands/project-add.js'
 import { serveCommand } from './commands/serve.js'
@@ -23,6 +26,9 @@ program.addCommand(removeCommand())
 program.addCommand(listCommand())
 program.addCommand(enableCommand())
 program.addCommand(disableCommand())
+program.addCommand(checkCommand())
+program.addCommand(updateCommand())
+program.addCommand(splitGlobalCommand())
 program.addCommand(projectsCommand())
 
 // `skills-ui project add <path>` sub-command

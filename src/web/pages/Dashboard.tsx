@@ -1,38 +1,60 @@
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
-import { getSkills, getProjects } from '../api.js'
+import { getSkills, getProjects, type Skill } from '../api.js'
+
+function countSkills(skills: Skill[] | undefined) {
+  const list = skills ?? []
+  return {
+    total: list.length,
+    global: list.filter(skill => skill.instances?.some(instance => instance.scope === 'global')).length,
+    project: list.filter(skill => skill.instances?.some(instance => instance.scope === 'project')).length,
+    catalogOnly: list.filter(skill => (skill.instances?.length ?? 0) === 0).length,
+  }
+}
 
 export default function Dashboard() {
   const skills = useQuery({ queryKey: ['skills'], queryFn: getSkills })
   const projects = useQuery({ queryKey: ['projects'], queryFn: getProjects })
+  const counts = countSkills(skills.data)
 
   return (
-    <div className="p-8">
-      <h1 className="text-2xl font-bold text-gray-900 mb-6">Dashboard</h1>
-      <div className="grid grid-cols-2 gap-4 mb-8">
-        <div className="bg-white rounded-lg border border-gray-200 p-6">
-          <p className="text-3xl font-bold text-indigo-600">
-            {skills.data?.length ?? '—'}
-          </p>
-          <p className="text-sm text-gray-500 mt-1">Installed skills</p>
-        </div>
-        <div className="bg-white rounded-lg border border-gray-200 p-6">
-          <p className="text-3xl font-bold text-indigo-600">
-            {projects.data?.length ?? '—'}
-          </p>
-          <p className="text-sm text-gray-500 mt-1">Registered projects</p>
-        </div>
+    <div className="mx-auto max-w-7xl p-4 sm:p-6 lg:p-8">
+      <div className="mb-6">
+        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Asset overview</p>
+        <h1 className="mt-1 text-2xl font-semibold tracking-tight text-slate-950">Dashboard</h1>
       </div>
-      <div className="flex gap-3">
+
+      {skills.error && (
+        <div className="mb-4 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          Failed to load skill assets. Project discovery or the skills CLI may need attention.
+        </div>
+      )}
+
+      <div className="mb-8 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+        {[
+          ['Known assets', skills.isLoading ? '...' : counts.total],
+          ['Global installs', skills.isLoading ? '...' : counts.global],
+          ['Project installs', skills.isLoading ? '...' : counts.project],
+          ['Catalog only', skills.isLoading ? '...' : counts.catalogOnly],
+          ['Projects', projects.isLoading ? '...' : (projects.data?.length ?? 0)],
+        ].map(([label, value]) => (
+          <div key={label} className="rounded-lg border border-slate-200 bg-white p-4">
+            <p className="text-2xl font-semibold text-slate-950">{value}</p>
+            <p className="mt-1 text-sm text-slate-500">{label}</p>
+          </div>
+        ))}
+      </div>
+
+      <div className="flex flex-wrap gap-3">
         <Link
           to="/skills"
-          className="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-md hover:bg-indigo-700"
+          className="rounded-md bg-slate-950 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
         >
-          Manage Skills
+          Manage Assets
         </Link>
         <Link
           to="/projects"
-          className="px-4 py-2 bg-white border border-gray-300 text-gray-700 text-sm font-medium rounded-md hover:bg-gray-50"
+          className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
         >
           Manage Projects
         </Link>

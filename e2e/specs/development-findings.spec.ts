@@ -330,16 +330,36 @@ test('UX-010: bulk uninstall shows progress and partial failure count', async ({
 })
 
 test('UX-008: dashboard distinguishes API failure from loading', async ({ page }) => {
-  await page.route('**/api/skills', route => route.fulfill({
+  await page.route('**/api/overview', route => route.fulfill({
     status: 503,
     contentType: 'application/json',
     body: '{"error":"down"}',
   }))
-  await page.route('**/api/projects', route => route.fulfill({
-    status: 200,
-    contentType: 'application/json',
-    body: '[]',
-  }))
   await page.goto('/')
   await expect(page.getByText(/failed|attention/i)).toBeVisible()
+})
+
+test('first-run dashboard explains setup and Scan now refreshes product counts', async ({ page }) => {
+  const empty = {
+    generatedAt: '2026-07-15T00:00:00.000Z', knownSkills: 0, skillsInstalledGlobally: 0,
+    skillsInstalledInProjects: 0, catalogOnlySkills: 0, registeredProjects: 0,
+    modifiedProjectCopies: 0, updateAvailableSkills: 0, sourceMissingSkills: 0, missingProjects: [],
+  }
+  await page.route('**/api/overview/reconcile', route => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify({ ...empty, generatedAt: '2026-07-15T01:00:00.000Z', knownSkills: 1 }),
+  }))
+  await page.route('**/api/overview', route => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify(empty),
+  }))
+
+  await page.goto('/')
+  await expect(page.getByRole('heading', { name: 'Set up skills-ui' })).toBeVisible()
+  await expect(page.getByText('Register a project.')).toBeVisible()
+  await page.getByRole('button', { name: 'Scan now' }).click()
+  await expect(page.getByText('Known Skills').locator('..').getByText('1')).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Set up skills-ui' })).toBeHidden()
 })

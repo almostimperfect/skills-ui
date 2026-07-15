@@ -96,6 +96,25 @@ export interface GlobalAgentConfig {
   enabled: string[]
 }
 
+export interface ProductOverview {
+  generatedAt: string
+  knownSkills: number
+  skillsInstalledGlobally: number
+  skillsInstalledInProjects: number
+  catalogOnlySkills: number
+  registeredProjects: number
+  modifiedProjectCopies: number
+  updateAvailableSkills: number
+  sourceMissingSkills: number
+  missingProjects: Array<{ path: string; name: string }>
+}
+
+export const getOverview = () =>
+  fetch(`${BASE}/overview`).then(r => json<ProductOverview>(r))
+
+export const reconcileOverview = () =>
+  fetch(`${BASE}/overview/reconcile`, { method: 'POST' }).then(r => json<ProductOverview>(r))
+
 // Skills
 export const getSkills = () =>
   fetch(`${BASE}/skills`).then(r => json<Skill[]>(r))

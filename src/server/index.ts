@@ -5,6 +5,7 @@ import { existsSync } from 'fs'
 import { agentsRouter } from './routes/agents.js'
 import { skillsRouter } from './routes/skills.js'
 import { projectsRouter } from './routes/projects.js'
+import { overviewRouter } from './routes/overview.js'
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url))
 
@@ -16,6 +17,7 @@ export function createApp(webDistPathOverride?: string) {
   app.use('/api/agents', agentsRouter())
   app.use('/api/skills', skillsRouter())
   app.use('/api/projects', projectsRouter())
+  app.use('/api/overview', overviewRouter())
 
   // Serve static web UI (only in production)
   const webDistPath = webDistPathOverride ?? join(__dirname, '..', 'web')

@@ -111,3 +111,16 @@ export interface SkillMaintenanceInfo {
   update: SkillUpdateInfo
   modifiedProjects: SkillDriftInfo[]
 }
+
+export interface ProductOverview {
+  generatedAt: string
+  knownSkills: number
+  skillsInstalledGlobally: number
+  skillsInstalledInProjects: number
+  catalogOnlySkills: number
+  registeredProjects: number
+  modifiedProjectCopies: number
+  updateAvailableSkills: number
+  sourceMissingSkills: number
+  missingProjects: Array<{ path: string; name: string }>
+}

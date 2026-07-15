@@ -88,6 +88,27 @@ describe('POST /api/skills', () => {
 })
 
 describe('GET /api/skills/:name', () => {
+  it('returns the canonical id when an old catalog id resolves through an alias', async () => {
+    mockInventoryInstance.resolveSkillRef.mockResolvedValue({
+      id: 'canonical-id',
+      aliases: ['old-id'],
+      name: 'continuity-skill',
+      description: 'Keeps stale links valid',
+      source: 'owner/repo',
+      reinstallSource: 'owner/repo',
+      reinstallable: true,
+      sourceType: 'github',
+      instances: [],
+    })
+
+    const app = createApp()
+    const res = await request(app).get('/api/skills/old-id')
+
+    expect(res.status).toBe(200)
+    expect(mockInventoryInstance.resolveSkillRef).toHaveBeenCalledWith('old-id', [])
+    expect(res.body.id).toBe('canonical-id')
+  })
+
   it('returns skill detail with status map across projects', async () => {
     mockRegistryInstance.listProjects.mockResolvedValue([
       { path: '/home/user/proj', name: 'proj', agents: ['claude-code'] },

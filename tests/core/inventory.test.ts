@@ -134,6 +134,42 @@ describe('inventory reconcile', () => {
     expect(skill?.reinstallable).toBe(true)
   })
 
+  it('keeps every prior catalog id resolvable when content changes and the live instance disappears', async () => {
+    const skillDir = join(projectPath, '.agents', 'skills', 'continuity-skill')
+    await writeSkill(skillDir, 'continuity-skill', 'First version')
+    let installed = true
+
+    mockListInstalledSkills.mockImplementation(async (options?: { global?: boolean; cwd?: string }) => {
+      if (options?.global || options?.cwd !== projectPath || !installed) return []
+      return [{
+        name: 'continuity-skill',
+        description: '',
+        path: skillDir,
+        scope: 'project' as const,
+        agents: ['Codex'],
+      }]
+    })
+
+    const manager = createInventoryManager(inventoryPath, archiveDir)
+    const firstState = await manager.reconcile([project])
+    const firstId = Object.values(firstState.skills)[0].id
+
+    await writeSkill(skillDir, 'continuity-skill', 'Second version')
+    const changedState = await manager.reconcile([project])
+    const changedSkill = Object.values(changedState.skills)[0]
+
+    expect(changedSkill.id).not.toBe(firstId)
+    expect(changedSkill.aliases).toContain(firstId)
+
+    installed = false
+    const catalogOnlyState = await manager.reconcile([project])
+    const catalogOnlySkill = Object.values(catalogOnlyState.skills)[0]
+
+    expect(catalogOnlySkill.instances).toEqual([])
+    expect((await manager.resolveSkillRef(firstId, [project]))?.id).toBe(catalogOnlySkill.id)
+    expect((await manager.resolveSkillRef(changedSkill.id, [project]))?.id).toBe(catalogOnlySkill.id)
+  })
+
   it('skips a broken registered project during reconcile', async () => {
     const skillDir = join(tmpPath, 'global-skill')
     await writeSkill(skillDir, 'global-skill')

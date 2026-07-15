@@ -75,6 +75,12 @@ function buildContentCatalogId(name: string, contentHash: string): string {
   return buildCatalogId(name, 'content-hash', contentHash)
 }
 
+function mergeAliases(canonicalId: string, ...values: Array<readonly string[] | undefined>): string[] | undefined {
+  const aliases = Array.from(new Set(values.flatMap(value => value ?? [])))
+    .filter(alias => alias && alias !== canonicalId)
+  return aliases.length > 0 ? aliases : undefined
+}
+
 function sameInstance(left: SkillInstance, right: SkillInstance): boolean {
   return left.scope === right.scope && left.path === right.path && left.projectPath === right.projectPath
 }
@@ -158,12 +164,18 @@ function normalizeInventoryState(raw: Partial<InventoryState> | undefined): Inve
     const sourceType = value.sourceType || 'unknown'
     const sourceRef = value.reinstallSource || value.source || value.archivedPath || legacyKey
     const id = value.id || buildCatalogId(value.name, sourceType, sourceRef)
+    const aliases = mergeAliases(
+      id,
+      Array.isArray(value.aliases) ? value.aliases.filter(alias => typeof alias === 'string') : undefined,
+      legacyKey !== id ? [legacyKey] : undefined
+    )
     const existing = normalized.skills[id]
 
     if (!existing) {
       normalized.skills[id] = {
         ...value,
         id,
+        aliases,
         sourceType,
       }
       continue
@@ -180,6 +192,7 @@ function normalizeInventoryState(raw: Partial<InventoryState> | undefined): Inve
       ...existing,
       ...value,
       id,
+      aliases: mergeAliases(id, existing.aliases, aliases),
       sourceType,
       instances: mergedInstances,
     }
@@ -486,9 +499,13 @@ export function createInventoryManager(inventoryPath: string, archiveDir: string
     const id = contentHash
       ? buildContentCatalogId(discovered.name, contentHash)
       : buildCatalogId(discovered.name, sourceType, sourceRef)
+    const aliases = previous
+      ? mergeAliases(id, previous.aliases, previous.id !== id ? [previous.id] : undefined)
+      : undefined
 
     return {
       id,
+      aliases,
       name: discovered.name,
       description: meta.description || previous?.description || '',
       source,
@@ -523,6 +540,7 @@ export function createInventoryManager(inventoryPath: string, archiveDir: string
             existing.instances.push(instance)
           }
         }
+        existing.aliases = mergeAliases(existing.id, existing.aliases, resolved.aliases)
       }
 
       // Preserve catalog entries even when there are no currently installed instances.
@@ -531,7 +549,16 @@ export function createInventoryManager(inventoryPath: string, archiveDir: string
         if (hasMigratedInstance(skill, next)) continue
         const preservedId = await resolveStoredSkillId(skill)
         if (next.skills[preservedId]) continue
-        next.skills[preservedId] = { ...skill, id: preservedId, instances: [] }
+        next.skills[preservedId] = {
+          ...skill,
+          id: preservedId,
+          aliases: mergeAliases(
+            preservedId,
+            skill.aliases,
+            skill.id !== preservedId ? [skill.id] : undefined
+          ),
+          instances: [],
+        }
       }
 
       await write(next)
@@ -554,6 +581,14 @@ export function createInventoryManager(inventoryPath: string, archiveDir: string
       const inventory = await this.reconcile(projects)
       if (inventory.skills[ref]) {
         return inventory.skills[ref]
+      }
+
+      const aliasMatches = Object.values(inventory.skills).filter(skill => skill.aliases?.includes(ref))
+      if (aliasMatches.length === 1) {
+        return aliasMatches[0]
+      }
+      if (aliasMatches.length > 1) {
+        throw new Error(`Skill reference "${ref}" is ambiguous. Use the catalog ID instead.`)
       }
 
       const matches = Object.values(inventory.skills).filter(skill => skill.name === ref)

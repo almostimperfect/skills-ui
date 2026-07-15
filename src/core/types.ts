@@ -35,6 +35,8 @@ export interface SkillInstance {
 }
 
 export interface InventorySkill extends Skill {
+  /** Previous catalog IDs retained so stale links remain resolvable */
+  aliases?: string[]
   reinstallSource: string
   sourceType: string
   archivedPath?: string

@@ -7,11 +7,10 @@ const UNIVERSAL_PROJECT_AGENTS = new Set(['codex', 'gemini-cli'])
 
 function uniqueProjectActions(
   project: ProjectWithMatrix,
-  action: 'enable' | 'disable',
-  projectPath: string
-): Array<Promise<unknown>> {
+  action: 'enable' | 'disable'
+): Array<{ skillId: string; skillName: string; agent: string }> {
   const seen = new Set<string>()
-  const requests: Array<Promise<unknown>> = []
+  const actions: Array<{ skillId: string; skillName: string; agent: string }> = []
 
   for (const skill of project.skills) {
     const agents = action === 'enable'
@@ -35,15 +34,15 @@ function uniqueProjectActions(
       if (seen.has(key)) continue
       seen.add(key)
 
-      requests.push(
-        action === 'enable'
-          ? enableSkill(skill.id, projectPath, agent)
-          : disableSkill(skill.id, projectPath, agent)
-      )
+      actions.push({ skillId: skill.id, skillName: skill.name, agent })
     }
   }
 
-  return requests
+  return actions
+}
+
+function plural(count: number, singular: string): string {
+  return `${count} ${singular}${count === 1 ? '' : 's'}`
 }
 
 export default function ProjectDetail() {
@@ -60,18 +59,24 @@ export default function ProjectDetail() {
 
   const enableAll = useMutation({
     mutationFn: async () => {
-      if (!project) return 0
-      const results = await Promise.allSettled(uniqueProjectActions(project, 'enable', projectPath))
-      return results.filter(result => result.status === 'rejected').length
+      if (!project) return { total: 0, failed: 0 }
+      const actions = uniqueProjectActions(project, 'enable')
+      const results = await Promise.allSettled(actions.map(action =>
+        enableSkill(action.skillId, projectPath, action.agent)
+      ))
+      return { total: actions.length, failed: results.filter(result => result.status === 'rejected').length }
     },
     onSuccess: () => qc.invalidateQueries({ queryKey }),
   })
 
   const disableAll = useMutation({
     mutationFn: async () => {
-      if (!project) return 0
-      const results = await Promise.allSettled(uniqueProjectActions(project, 'disable', projectPath))
-      return results.filter(result => result.status === 'rejected').length
+      if (!project) return { total: 0, failed: 0 }
+      const actions = uniqueProjectActions(project, 'disable')
+      const results = await Promise.allSettled(actions.map(action =>
+        disableSkill(action.skillId, projectPath, action.agent)
+      ))
+      return { total: actions.length, failed: results.filter(result => result.status === 'rejected').length }
     },
     onSuccess: () => qc.invalidateQueries({ queryKey }),
   })
@@ -80,6 +85,17 @@ export default function ProjectDetail() {
   if (error || !project) return <div className="p-8 text-red-600">Failed to load project</div>
 
   const skills = project.skills
+  const confirmBulk = (action: 'enable' | 'disable') => {
+    const actions = uniqueProjectActions(project, action)
+    if (actions.length === 0) return
+    const skillCount = new Set(actions.map(item => item.skillId)).size
+    const message = action === 'enable'
+      ? `Install ${plural(skillCount, 'Skill')} across ${plural(actions.length, 'Agent target')} in ${project.name}?`
+      : `Remove project installations for ${plural(skillCount, 'Skill')} across ${plural(actions.length, 'Agent target')} from ${project.name}?\n\nGlobal installations are not removed. Skills remain in the catalog.`
+    if (!window.confirm(message)) return
+    if (action === 'enable') enableAll.mutate()
+    else disableAll.mutate()
+  }
 
   return (
     <div className="mx-auto max-w-7xl p-4 sm:p-6 lg:p-8">
@@ -101,14 +117,14 @@ export default function ProjectDetail() {
 
       <div className="mb-4 flex flex-wrap gap-2">
         <button
-          onClick={() => enableAll.mutate()}
+          onClick={() => confirmBulk('enable')}
           disabled={enableAll.isPending || disableAll.isPending}
           className="rounded-md border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-800 hover:bg-slate-50"
         >
           {enableAll.isPending ? 'Installing...' : 'Install all available'}
         </button>
         <button
-          onClick={() => disableAll.mutate()}
+          onClick={() => confirmBulk('disable')}
           disabled={enableAll.isPending || disableAll.isPending}
           className="rounded-md border border-red-200 bg-white px-3 py-2 text-xs font-medium text-red-700 hover:bg-red-50"
         >
@@ -116,9 +132,15 @@ export default function ProjectDetail() {
         </button>
       </div>
 
-      {((enableAll.data ?? 0) > 0 || (disableAll.data ?? 0) > 0) && (
+      {((enableAll.data?.failed ?? 0) > 0 || (disableAll.data?.failed ?? 0) > 0) && (
         <p role="alert" className="mb-4 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-          {(enableAll.data ?? disableAll.data)} change{(enableAll.data ?? disableAll.data) === 1 ? '' : 's'} failed. Successful changes were preserved.
+          {(enableAll.data ?? disableAll.data)!.failed} change{(enableAll.data ?? disableAll.data)!.failed === 1 ? '' : 's'} failed.{' '}
+          {(enableAll.data ?? disableAll.data)!.total - (enableAll.data ?? disableAll.data)!.failed} succeeded.
+        </p>
+      )}
+      {(enableAll.data?.failed === 0 || disableAll.data?.failed === 0) && (
+        <p role="status" className="mb-4 rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+          {(enableAll.data ?? disableAll.data)!.total} project change{(enableAll.data ?? disableAll.data)!.total === 1 ? '' : 's'} completed.
         </p>
       )}
 

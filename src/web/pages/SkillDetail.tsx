@@ -3,6 +3,7 @@ import { useParams, Link, useNavigate } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ApiError, getSkill, getSkillMaintenance, installGlobalSkill, splitGlobalSkill, updateSkill } from '../api.js'
 import AgentSkillControl from '../components/AgentSkillControl.js'
+import InstallProjectPanel from '../components/InstallProjectPanel.js'
 
 export default function SkillDetail() {
   const { name: encodedSkillId } = useParams<{ name: string }>()
@@ -105,12 +106,6 @@ export default function SkillDetail() {
                 {installGlobalMutation.isPending ? 'Installing...' : 'Install Globally'}
               </button>
             )}
-            <Link
-              to="/projects"
-              className="rounded-md border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
-            >
-              Install To Project
-            </Link>
           </div>
         </div>
         {installGlobalMutation.isError && (
@@ -133,6 +128,8 @@ export default function SkillDetail() {
           </div>
         </div>
       </div>
+
+      <InstallProjectPanel skill={skill} />
 
       <div className="mb-6 rounded-lg border border-slate-200 bg-white p-4">
         <p className="text-sm font-medium text-slate-950">What the status labels mean</p>

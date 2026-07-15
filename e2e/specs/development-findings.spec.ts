@@ -95,6 +95,7 @@ test('UX-004/005: project removal confirms and reports a failed DELETE', async (
 })
 
 test('UX-005/007: Add Project supports keyboard control and visible validation errors', async ({ page }) => {
+  let postRequests = 0
   await page.route('**/api/agents', route => route.fulfill({
     status: 200,
     contentType: 'application/json',
@@ -102,7 +103,7 @@ test('UX-005/007: Add Project supports keyboard control and visible validation e
   }))
   await page.route('**/api/projects', route =>
     route.request().method() === 'POST'
-      ? route.fulfill({ status: 400, contentType: 'application/json', body: '{"error":"path must be absolute"}' })
+      ? (postRequests += 1, route.fulfill({ status: 400, contentType: 'application/json', body: '{"error":"path must be absolute"}' }))
       : route.fulfill({ status: 200, contentType: 'application/json', body: '[]' })
   )
 
@@ -116,7 +117,27 @@ test('UX-005/007: Add Project supports keyboard control and visible validation e
   await page.getByRole('button', { name: 'Add Project' }).click()
   await page.getByPlaceholder('/absolute/path/to/project').fill('./relative')
   await page.keyboard.press('Enter')
-  await expect(page.getByRole('alert')).toContainText('path must be absolute')
+  await expect(page.getByRole('alert')).toContainText('Enter an absolute project path.')
+  expect(postRequests).toBe(0)
+})
+
+test('project registration returns to the requesting Skill detail', async ({ page }) => {
+  await page.route('**/api/agents', route => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: '["codex"]',
+  }))
+  await page.route('**/api/projects', route => route.request().method() === 'POST'
+    ? route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify(project) })
+    : route.fulfill({ status: 200, contentType: 'application/json', body: '[]' })
+  )
+
+  await page.goto('/projects?returnSkill=basic-skill-id')
+  await page.getByRole('button', { name: 'Add Project' }).click()
+  await page.getByPlaceholder('/absolute/path/to/project').fill(projectPath)
+  await page.getByRole('button', { name: 'Add', exact: true }).click()
+
+  await expect(page).toHaveURL(/\/skills\/basic-skill-id$/)
 })
 
 test('UX-001: an unknown asset renders a not-found state', async ({ page }) => {
@@ -228,6 +249,48 @@ test('UX-009: a failed explicit project removal renders feedback', async ({ page
   await expect(page.getByRole('alert')).toContainText(/failed|disk failure/i)
 })
 
+test('targeted install: a Skill is installed into a selected project without leaving detail', async ({ page }) => {
+  let enableRequests = 0
+  const projectSkill = {
+    ...skill,
+    instances: [],
+    status: {
+      [projectPath]: {
+        codex: { state: 'available', canEnable: true, canDisable: false },
+      },
+    },
+  }
+  await page.route('**/api/projects', route => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify([project]),
+  }))
+  await page.route('**/api/skills/basic-skill-id/maintenance', route => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify({
+      update: { supported: false, status: 'unsupported', checkedAt: '2026-07-15T00:00:00.000Z' },
+      modifiedProjects: [],
+    }),
+  }))
+  await page.route('**/api/skills/basic-skill-id/enable', route => {
+    enableRequests += 1
+    return route.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true}' })
+  })
+  await page.route('**/api/skills/basic-skill-id', route => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify(projectSkill),
+  }))
+
+  await page.goto('/skills/basic-skill-id')
+  await page.getByRole('button', { name: 'Install basic-skill in app for codex' }).click()
+
+  await expect(page).toHaveURL(/\/skills\/basic-skill-id$/)
+  await expect(page.getByText('Installed basic-skill in app.')).toBeVisible()
+  expect(enableRequests).toBe(1)
+})
+
 test('UX-010: bulk uninstall shows progress and partial failure count', async ({ page }) => {
   await page.route('**/api/projects/**', route => route.fulfill({
     status: 200,
@@ -246,9 +309,18 @@ test('UX-010: bulk uninstall shows progress and partial failure count', async ({
     await released
     await route.fulfill({ status: 500, contentType: 'application/json', body: '{"error":"disk failure"}' })
   })
+  let confirmed = false
+  page.once('dialog', async dialog => {
+    confirmed = true
+    expect(dialog.message()).toContain('1 Skill')
+    expect(dialog.message()).toContain('1 Agent target')
+    expect(dialog.message()).toContain('Global installations are not removed')
+    await dialog.accept()
+  })
 
   await page.goto(`/projects/${encodeURIComponent(projectPath)}`)
   await page.getByRole('button', { name: 'Uninstall project installs' }).click()
+  expect(confirmed).toBe(true)
   await expect(page.getByRole('button', { name: 'Uninstalling...' })).toBeDisabled()
   await expect(page.getByRole('button', { name: 'Install all available' })).toBeDisabled()
   release()

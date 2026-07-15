@@ -1,13 +1,17 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { getAgents, getProjects, registerProject, unregisterProject, updateProject } from '../api.js'
 
 export default function Projects() {
   const [showAdd, setShowAdd] = useState(false)
   const [newPath, setNewPath] = useState('')
   const [newAgents, setNewAgents] = useState<string[]>(['codex'])
+  const [pathError, setPathError] = useState('')
   const qc = useQueryClient()
+  const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const returnSkill = searchParams.get('returnSkill')
   const { data: projects, isLoading } = useQuery({ queryKey: ['projects'], queryFn: getProjects })
   const { data: supportedAgents } = useQuery({ queryKey: ['agents'], queryFn: getAgents })
 
@@ -18,6 +22,8 @@ export default function Projects() {
       setShowAdd(false)
       setNewPath('')
       setNewAgents(['codex'])
+      setPathError('')
+      if (returnSkill) navigate(`/skills/${encodeURIComponent(returnSkill)}`)
     },
   })
 
@@ -54,6 +60,11 @@ export default function Projects() {
           className="bg-white rounded-lg border border-gray-200 p-4 mb-4"
           onSubmit={event => {
             event.preventDefault()
+            const isAbsolute = newPath.startsWith('/') || /^[A-Za-z]:[\\/]/.test(newPath)
+            if (!isAbsolute) {
+              setPathError('Enter an absolute project path.')
+              return
+            }
             if (newPath && !addMutation.isPending) addMutation.mutate()
           }}
           onKeyDown={event => {
@@ -64,10 +75,13 @@ export default function Projects() {
             autoFocus
             type="text"
             value={newPath}
-            onChange={e => setNewPath(e.target.value)}
+            onChange={e => { setNewPath(e.target.value); setPathError('') }}
             placeholder="/absolute/path/to/project"
             className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 mb-3"
           />
+          <p className="mb-3 text-xs leading-5 text-slate-500">
+            Registration does not move or delete project files. Only registered paths are scanned.
+          </p>
           <div className="mb-3 flex flex-wrap gap-2">
             {supportedAgents?.map(agent => {
               const enabled = newAgents.includes(agent)
@@ -103,9 +117,9 @@ export default function Projects() {
               Cancel
             </button>
           </div>
-          {addMutation.isError && (
+          {(pathError || addMutation.isError) && (
             <p role="alert" className="mt-3 text-sm text-red-700">
-              {addMutation.error instanceof Error ? addMutation.error.message : 'Failed to add project.'}
+              {pathError || (addMutation.error instanceof Error ? addMutation.error.message : 'Failed to add project.')}
             </p>
           )}
         </form>

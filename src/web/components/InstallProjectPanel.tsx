@@ -2,15 +2,17 @@ import { useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { enableSkill, getProjects, type SkillWithStatus } from '../api.js'
+import { useI18n } from '../i18n/I18nProvider.js'
 
 interface Props {
   skill: SkillWithStatus
 }
 
 export default function InstallProjectPanel({ skill }: Props) {
+  const { localizeError, t } = useI18n()
   const qc = useQueryClient()
   const [selectedPath, setSelectedPath] = useState('')
-  const [success, setSuccess] = useState('')
+  const [successProject, setSuccessProject] = useState('')
   const { data: projects, isLoading, isError } = useQuery({ queryKey: ['projects'], queryFn: getProjects })
 
   useEffect(() => {
@@ -37,7 +39,7 @@ export default function InstallProjectPanel({ skill }: Props) {
     mutationFn: ({ projectPath, agent }: { projectPath: string; agent: string }) =>
       enableSkill(skill.id, projectPath, agent),
     onSuccess: async () => {
-      if (selected) setSuccess(`Installed ${skill.name} in ${selected.name}.`)
+      if (selected) setSuccessProject(selected.name)
       await Promise.all([
         qc.invalidateQueries({ queryKey: ['skill'] }),
         qc.invalidateQueries({ queryKey: ['skills'] }),
@@ -49,25 +51,25 @@ export default function InstallProjectPanel({ skill }: Props) {
 
   return (
     <section className="mb-6 rounded-lg border border-slate-200 bg-white p-4">
-      <h2 className="text-sm font-medium text-slate-950">Install in project</h2>
-      <p className="mt-1 text-xs text-slate-500">Choose a registered project and install only to an available Agent target.</p>
-      {isLoading && <p className="mt-3 text-sm text-slate-500">Loading projects...</p>}
-      {isError && <p role="alert" className="mt-3 text-sm text-red-700">Failed to load registered projects.</p>}
+      <h2 className="text-sm font-medium text-slate-950">{t('installProject.title')}</h2>
+      <p className="mt-1 text-xs text-slate-500">{t('installProject.help')}</p>
+      {isLoading && <p className="mt-3 text-sm text-slate-500">{t('installProject.loading')}</p>}
+      {isError && <p role="alert" className="mt-3 text-sm text-red-700">{t('installProject.loadError')}</p>}
       {projects?.length === 0 && (
         <p className="mt-3 text-sm text-slate-600">
-          No projects are registered.{' '}
+          {t('installProject.noProjects')}{' '}
           <Link className="font-medium text-slate-950 underline" to={`/projects?returnSkill=${encodeURIComponent(skill.id)}`}>
-            Register a project
+            {t('installProject.register')}
           </Link>
         </p>
       )}
       {projects && projects.length > 0 && (
         <>
-          <label htmlFor="install-project" className="mt-3 block text-xs font-medium text-slate-700">Project</label>
+          <label htmlFor="install-project" className="mt-3 block text-xs font-medium text-slate-700">{t('installProject.projectLabel')}</label>
           <select
             id="install-project"
             value={selectedPath}
-            onChange={event => { setSelectedPath(event.target.value); setSuccess('') }}
+            onChange={event => { setSelectedPath(event.target.value); setSuccessProject('') }}
             className="mt-1 w-full max-w-md rounded-md border border-slate-300 bg-white px-3 py-2 text-sm"
           >
             {projects.map(project => <option key={project.path} value={project.path}>{project.name}</option>)}
@@ -78,31 +80,39 @@ export default function InstallProjectPanel({ skill }: Props) {
               return (
                 <button
                   key={group}
-                  aria-label={`Install ${skill.name} in ${selected?.name ?? 'project'} for ${group}`}
+                  aria-label={t('installProject.ariaInstall', {
+                    skill: skill.name,
+                    project: selected?.name ?? t('installProject.projectLabel'),
+                    agents: group,
+                  })}
                   onClick={() => selected && install.mutate({ projectPath: selected.path, agent })}
                   disabled={install.isPending}
                   className="rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white hover:bg-slate-800 disabled:opacity-60"
                 >
-                  {install.isPending ? 'Installing...' : `Install for ${group}`}
+                  {install.isPending ? t('installProject.installing') : t('installProject.installFor', { agents: group })}
                 </button>
               )
             })}
             {selected && actions.length === 0 && (
               <p className="text-sm text-slate-500">
                 {installedLocally
-                  ? 'Already installed in this project.'
+                  ? t('installProject.installed')
                   : inheritedGlobally
-                    ? 'Already available through the global installation. Use Split Global Into Projects below to replace inherited access with project copies.'
-                    : 'No available Agent targets in this project.'}
+                    ? t('installProject.inherited')
+                    : t('installProject.noTargets')}
               </p>
             )}
           </div>
         </>
       )}
-      {success && <p role="status" className="mt-3 text-sm text-emerald-700">{success}</p>}
+      {successProject && (
+        <p role="status" className="mt-3 text-sm text-emerald-700">
+          {t('skill.installProjectSuccess', { skill: skill.name, project: successProject })}
+        </p>
+      )}
       {install.isError && (
         <p role="alert" className="mt-3 text-sm text-red-700">
-          {install.error instanceof Error ? install.error.message : 'Project installation failed.'}
+          {localizeError(install.error, 'installProject.error')}
         </p>
       )}
     </section>

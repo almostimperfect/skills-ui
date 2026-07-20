@@ -106,3 +106,87 @@ test('Chinese bulk uninstall confirmation explains complete impact', async ({ pa
   })
   await page.getByRole('button', { name: '卸载项目安装' }).click()
 })
+
+test('Chinese Skill detail localizes global split impact', async ({ page }) => {
+  const projectPath = '/tmp/e2e/projects/app'
+  const project = { path: projectPath, name: 'app', agents: ['codex'] }
+  const skill = {
+    id: 'basic-skill-id',
+    name: 'basic-skill',
+    description: 'A fixture Skill',
+    source: 'owner/repo',
+    reinstallable: true,
+    instances: [{ scope: 'global', path: '/tmp/e2e/global/basic-skill', agents: ['Codex'] }],
+    status: { [projectPath]: { codex: { state: 'global', canEnable: false, canDisable: false } } },
+  }
+  await page.route('**/api/projects', route => route.fulfill({
+    status: 200, contentType: 'application/json', body: JSON.stringify([project]),
+  }))
+  await page.route('**/api/skills/basic-skill-id/maintenance', route => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify({
+      update: { supported: false, status: 'unsupported', checkedAt: '2026-07-19T00:00:00.000Z' },
+      modifiedProjects: [],
+    }),
+  }))
+  await page.route('**/api/skills/basic-skill-id', route => route.fulfill({
+    status: 200, contentType: 'application/json', body: JSON.stringify(skill),
+  }))
+
+  await page.goto('/skills/basic-skill-id')
+  await expect(page.getByRole('link', { name: '← 返回 Skills' })).toBeVisible()
+  await expect(page.getByText('全局安装', { exact: true }).first()).toBeVisible()
+
+  page.once('dialog', async dialog => {
+    expect(dialog.message()).toContain('将 basic-skill 拆分为项目副本')
+    expect(dialog.message()).toContain('app (codex)')
+    expect(dialog.message()).toContain('会移除全局安装')
+    await dialog.dismiss()
+  })
+  await page.getByRole('button', { name: '将全局安装拆分到项目' }).click()
+})
+
+test('Chinese targeted install keeps Skill and project names unchanged', async ({ page }) => {
+  const projectPath = '/tmp/e2e/projects/app'
+  const project = { path: projectPath, name: 'app', agents: ['codex'] }
+  let installed = false
+  const baseSkill = {
+    id: 'basic-skill-id',
+    name: 'basic-skill',
+    description: 'A fixture Skill',
+    source: 'owner/repo',
+    reinstallable: true,
+    instances: [],
+    status: { [projectPath]: { codex: { state: 'available', canEnable: true, canDisable: false } } },
+  }
+  await page.route('**/api/projects', route => route.fulfill({
+    status: 200, contentType: 'application/json', body: JSON.stringify([project]),
+  }))
+  await page.route('**/api/skills/basic-skill-id/maintenance', route => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify({
+      update: { supported: false, status: 'unsupported', checkedAt: '2026-07-19T00:00:00.000Z' },
+      modifiedProjects: [],
+    }),
+  }))
+  await page.route('**/api/skills/basic-skill-id/enable', route => {
+    installed = true
+    return route.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true}' })
+  })
+  await page.route('**/api/skills/basic-skill-id', route => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify(installed ? {
+      ...baseSkill,
+      instances: [{ scope: 'project', path: `${projectPath}/.agents/skills/basic-skill`, agents: ['Codex'], projectPath }],
+      status: { [projectPath]: { codex: { state: 'project', canEnable: false, canDisable: true } } },
+    } : baseSkill),
+  }))
+
+  await page.goto('/skills/basic-skill-id')
+  await page.getByRole('button', { name: '将 basic-skill 安装到 app（codex）' }).click()
+  await expect(page.getByRole('status')).toContainText('已将 basic-skill 安装到 app。')
+  await expect(page.getByText('已安装到此项目。')).toBeVisible()
+})

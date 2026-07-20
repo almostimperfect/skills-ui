@@ -7,6 +7,7 @@ export default defineConfig({
   fullyParallel: false,
   workers: 1,
   retries: 0,
+  grepInvert: process.env.E2E_NETWORK === '1' ? undefined : /@network/,
   reporter: [['list']],
   use: {
     baseURL: 'http://127.0.0.1:3456',

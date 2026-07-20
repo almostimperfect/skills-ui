@@ -17,8 +17,9 @@
     "cleanup:xtest": "node scripts/seed-xtest-data.mjs cleanup",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:docker": "docker build -f Dockerfile.test -t skills-ui-development-test . && docker run --rm skills-ui-development-test",
-    "test:e2e": "sh e2e/scripts/run-e2e.sh"
+    "test:docker": "docker build -f Dockerfile.test -t skills-ui-development-test . && docker run --rm --network=none skills-ui-development-test",
+    "test:e2e": "sh e2e/scripts/run-e2e.sh",
+    "test:e2e:network": "sh e2e/scripts/run-e2e.sh --network"
   },
   "dependencies": {
     "commander": "^12.1.0",

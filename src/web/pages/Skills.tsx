@@ -3,23 +3,27 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { getGlobalAgents, getSkills, installGlobalSkill, removeSkill, updateGlobalAgents, type Skill } from '../api.js'
 import AddSkillDialog from '../components/AddSkillDialog.js'
+import { useI18n } from '../i18n/I18nProvider.js'
+import type { TranslationKey, TranslationParams } from '../i18n/translations.js'
 
 type Filter = 'all' | 'global' | 'project' | 'catalog'
 
-function getAssetState(skill: Skill): { label: string; tone: string } {
+type Translate = (key: TranslationKey, params?: TranslationParams) => string
+
+function getAssetState(skill: Skill, t: Translate): { label: string; tone: string } {
   const instances = skill.instances ?? []
   const hasGlobal = instances.some(instance => instance.scope === 'global')
   const hasProject = instances.some(instance => instance.scope === 'project')
-  if (hasGlobal && hasProject) return { label: 'Global + project', tone: 'bg-blue-50 text-blue-700 border-blue-200' }
-  if (hasGlobal) return { label: 'Global', tone: 'bg-slate-100 text-slate-700 border-slate-200' }
-  if (hasProject) return { label: 'Project', tone: 'bg-emerald-50 text-emerald-700 border-emerald-200' }
-  return { label: 'Catalog only', tone: 'bg-amber-50 text-amber-700 border-amber-200' }
+  if (hasGlobal && hasProject) return { label: t('skills.stateGlobalProject'), tone: 'bg-blue-50 text-blue-700 border-blue-200' }
+  if (hasGlobal) return { label: t('skills.stateGlobal'), tone: 'bg-slate-100 text-slate-700 border-slate-200' }
+  if (hasProject) return { label: t('skills.stateProject'), tone: 'bg-emerald-50 text-emerald-700 border-emerald-200' }
+  return { label: t('skills.stateCatalog'), tone: 'bg-amber-50 text-amber-700 border-amber-200' }
 }
 
-function sourceLabel(skill: Skill): string {
-  if (!skill.source) return 'No source recorded'
-  if (skill.source.includes('/.skills-ui/archive/')) return 'Archived copy'
-  if (skill.source.startsWith('http')) return 'Remote source'
+function sourceLabel(skill: Skill, t: Translate): string {
+  if (!skill.source) return t('skills.sourceNone')
+  if (skill.source.includes('/.skills-ui/archive/')) return t('skills.sourceArchived')
+  if (skill.source.startsWith('http')) return t('skills.sourceRemote')
   if (skill.source.startsWith('/')) return skill.source.split('/').slice(-2).join('/')
   return skill.source
 }
@@ -33,8 +37,9 @@ function counts(skill: Skill) {
 }
 
 export default function Skills() {
+  const { localizeError, t } = useI18n()
   const [showAdd, setShowAdd] = useState(false)
-  const [installSuccess, setInstallSuccess] = useState('')
+  const [installSuccess, setInstallSuccess] = useState(false)
   const [search, setSearch] = useState('')
   const qc = useQueryClient()
   const { data: skills, isLoading, error } = useQuery({ queryKey: ['skills'], queryFn: getSkills })
@@ -81,26 +86,26 @@ export default function Skills() {
     <div className="mx-auto max-w-7xl p-4 sm:p-6 lg:p-8">
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Skill catalog</p>
-          <h1 className="mt-1 text-2xl font-semibold tracking-tight text-slate-950">Skills</h1>
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{t('skills.eyebrow')}</p>
+          <h1 className="mt-1 text-2xl font-semibold tracking-tight text-slate-950">{t('skills.title')}</h1>
           <p className="mt-2 max-w-2xl text-sm text-slate-600">
-            Known skills stay in the catalog even when every installation is removed.
+            {t('skills.description')}
           </p>
         </div>
         <button
           onClick={() => setShowAdd(true)}
           className="w-full rounded-md bg-slate-950 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 sm:w-auto"
         >
-          Install new Skill
+          {t('skills.installNew')}
         </button>
       </div>
 
       <div className="mb-4 rounded-lg border border-slate-200 bg-white p-4">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div>
-            <p className="text-sm font-medium text-slate-950">Global install targets</p>
+            <p className="text-sm font-medium text-slate-950">{t('skills.globalTargets')}</p>
             <p className="mt-1 max-w-3xl text-xs leading-5 text-slate-500">
-              Install Global writes only to these enabled AI tools. Project installs use each project's enabled tools.
+              {t('skills.globalTargetsHelp')}
             </p>
           </div>
           <div className="flex flex-wrap gap-2 lg:justify-end">
@@ -119,7 +124,7 @@ export default function Skills() {
                       ? 'border-slate-900 bg-slate-950 text-white'
                       : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
                   }`}
-                  title={enabled && globalAgents.enabled.length === 1 ? 'Keep at least one global install target enabled.' : undefined}
+                  title={enabled && globalAgents.enabled.length === 1 ? t('skills.keepOneTarget') : undefined}
                 >
                   {agent}
                 </button>
@@ -129,7 +134,7 @@ export default function Skills() {
         </div>
         {updateGlobalAgentsMutation.isError && (
           <p className="mt-2 text-xs text-red-700">
-            {updateGlobalAgentsMutation.error instanceof Error ? updateGlobalAgentsMutation.error.message : 'Failed to update global install targets.'}
+            {localizeError(updateGlobalAgentsMutation.error, 'skills.globalTargetsError')}
           </p>
         )}
       </div>
@@ -139,15 +144,15 @@ export default function Skills() {
           type="text"
           value={search}
           onChange={e => setSearch(e.target.value)}
-          placeholder="Search Skills, descriptions, or sources..."
+          placeholder={t('skills.searchPlaceholder')}
           className="mb-3 w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-400"
         />
         <div className="flex flex-wrap gap-2">
           {([
-            ['all', `All ${summary.all}`],
-            ['global', `Global ${summary.global}`],
-            ['project', `Project ${summary.project}`],
-            ['catalog', `Catalog ${summary.catalog}`],
+            ['all', t('skills.filterAll', { count: summary.all })],
+            ['global', t('skills.filterGlobal', { count: summary.global })],
+            ['project', t('skills.filterProject', { count: summary.project })],
+            ['catalog', t('skills.filterCatalog', { count: summary.catalog })],
           ] as Array<[Filter, string]>).map(([key, label]) => (
             <button
               key={key}
@@ -164,18 +169,16 @@ export default function Skills() {
         </div>
       </div>
 
-      {isLoading && <p className="text-sm text-slate-500">Loading Skills...</p>}
-      {installSuccess && <p role="status" className="mb-4 rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{installSuccess}</p>}
+      {isLoading && <p className="text-sm text-slate-500">{t('skills.loading')}</p>}
+      {installSuccess && <p role="status" className="mb-4 rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{t('skills.installSuccess')}</p>}
       {error && (
         <div role="alert" className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-          Failed to load skill assets. Reconcile may be blocked by a missing project or skills CLI error.
+          {t('skills.loadError')}
         </div>
       )}
       {(removeMutation.isError || installGlobalMutation.isError) && (
         <div role="alert" className="mb-4 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-          {(removeMutation.error ?? installGlobalMutation.error) instanceof Error
-            ? (removeMutation.error ?? installGlobalMutation.error as Error).message
-            : 'Failed to update the asset installation.'}
+          {localizeError(removeMutation.error ?? installGlobalMutation.error, 'skills.updateError')}
         </div>
       )}
 
@@ -184,10 +187,10 @@ export default function Skills() {
           <div key={skill.id} className="grid gap-4 border-b border-slate-100 px-4 py-4 last:border-b-0 lg:grid-cols-[minmax(0,1fr)_220px]">
             <div className="min-w-0">
               <div className="mb-2 flex flex-wrap items-center gap-2">
-                <span className={`rounded-full border px-2 py-0.5 text-xs font-medium ${getAssetState(skill).tone}`}>
-                  {getAssetState(skill).label}
+                <span className={`rounded-full border px-2 py-0.5 text-xs font-medium ${getAssetState(skill, t).tone}`}>
+                  {getAssetState(skill, t).label}
                 </span>
-                <span className="text-xs text-slate-400">{sourceLabel(skill)}</span>
+                <span className="text-xs text-slate-400">{sourceLabel(skill, t)}</span>
               </div>
               <Link
                 to={`/skills/${encodeURIComponent(skill.id)}`}
@@ -199,9 +202,9 @@ export default function Skills() {
                 <p className="mt-1 line-clamp-2 max-w-4xl text-sm leading-6 text-slate-600">{skill.description}</p>
               )}
               <div className="mt-3 flex flex-wrap gap-2 text-xs text-slate-500">
-                <span>{counts(skill).global} global installs</span>
-                <span>{counts(skill).project} project installs</span>
-                <span>{skill.reinstallable ? 'Reinstallable' : 'Source missing'}</span>
+                <span>{t(counts(skill).global === 1 ? 'skills.globalInstallOne' : 'skills.globalInstallMany', { count: counts(skill).global })}</span>
+                <span>{t(counts(skill).project === 1 ? 'skills.projectInstallOne' : 'skills.projectInstallMany', { count: counts(skill).project })}</span>
+                <span>{skill.reinstallable ? t('skills.reinstallable') : t('skills.sourceMissing')}</span>
               </div>
             </div>
             <div className="flex flex-wrap items-start gap-2 lg:justify-end">
@@ -209,40 +212,40 @@ export default function Skills() {
                 to={`/skills/${encodeURIComponent(skill.id)}`}
                 className="rounded-md border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
               >
-                Details
+                {t('skills.details')}
               </Link>
               {counts(skill).global > 0 ? (
                 <button
                   onClick={() => {
-                    if (!window.confirm(`Remove global install for ${skill.name}? The asset remains in the catalog.`)) return
+                    if (!window.confirm(t('skills.removeGlobalConfirm', { skill: skill.name }))) return
                     removeMutation.mutate(skill.id)
                   }}
                   className="rounded-md border border-red-200 bg-white px-3 py-2 text-xs font-medium text-red-700 hover:bg-red-50"
                 >
-                  Uninstall Global
+                  {t('skills.uninstallGlobal')}
                 </button>
               ) : (
                 <button
                   onClick={() => installGlobalMutation.mutate(skill.id)}
                   disabled={!skill.reinstallable || installGlobalMutation.isPending}
                   className="rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
-                  title={globalAgents ? `Install to: ${globalAgents.enabled.join(', ')}` : undefined}
+                  title={globalAgents ? t('skills.installTargetsTitle', { agents: globalAgents.enabled.join(', ') }) : undefined}
                 >
-                  Install Global
+                  {t('skills.installGlobal')}
                 </button>
               )}
             </div>
           </div>
         ))}
         {filtered?.length === 0 && (
-          <p className="py-10 text-center text-sm text-slate-400">No Skills found</p>
+          <p className="py-10 text-center text-sm text-slate-400">{t('skills.empty')}</p>
         )}
       </div>
 
       {showAdd && (
         <AddSkillDialog
           onClose={() => setShowAdd(false)}
-          onInstalled={() => setInstallSuccess('The new Skill source was added to the catalog and installed globally.')}
+          onInstalled={() => setInstallSuccess(true)}
         />
       )}
     </div>

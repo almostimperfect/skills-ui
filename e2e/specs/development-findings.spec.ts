@@ -1,5 +1,9 @@
 import { expect, test } from '@playwright/test'
 
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('skills-ui.locale', 'en'))
+})
+
 const skill = {
   id: 'basic-skill-id',
   name: 'basic-skill',

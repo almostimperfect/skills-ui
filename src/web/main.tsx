@@ -9,23 +9,26 @@ import Skills from './pages/Skills.js'
 import SkillDetail from './pages/SkillDetail.js'
 import Projects from './pages/Projects.js'
 import ProjectDetail from './pages/ProjectDetail.js'
+import { I18nProvider } from './i18n/I18nProvider.js'
 
 const queryClient = new QueryClient()
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
-        <Routes>
-          <Route element={<Layout />}>
-            <Route index element={<Dashboard />} />
-            <Route path="skills" element={<Skills />} />
-            <Route path="skills/:name" element={<SkillDetail />} />
-            <Route path="projects" element={<Projects />} />
-            <Route path="projects/:projectPath" element={<ProjectDetail />} />
-          </Route>
-        </Routes>
-      </BrowserRouter>
+      <I18nProvider>
+        <BrowserRouter>
+          <Routes>
+            <Route element={<Layout />}>
+              <Route index element={<Dashboard />} />
+              <Route path="skills" element={<Skills />} />
+              <Route path="skills/:name" element={<SkillDetail />} />
+              <Route path="projects" element={<Projects />} />
+              <Route path="projects/:projectPath" element={<ProjectDetail />} />
+            </Route>
+          </Routes>
+        </BrowserRouter>
+      </I18nProvider>
     </QueryClientProvider>
   </StrictMode>
 )

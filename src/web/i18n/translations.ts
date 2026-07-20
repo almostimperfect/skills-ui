@@ -4,6 +4,7 @@ export type TranslationParams = Record<string, string | number>
 
 export const en = {
   'app.title': 'skills-ui',
+  'app.documentTitle': 'skills-ui — Local Skill manager',
   'app.subtitle': 'Local Skill assets',
   'nav.dashboard': 'Dashboard',
   'nav.skills': 'Skills',
@@ -11,6 +12,8 @@ export const en = {
   'language.label': 'Interface language',
   'language.zh': '中文',
   'language.en': 'English',
+  'language.switchToChinese': 'Switch interface language to Chinese',
+  'language.switchToEnglish': 'Switch interface language to English',
   'skill.installProjectSuccess': 'Installed {skill} in {project}.',
   'error.skillNotFound': 'Skill not found',
   'error.projectNotFound': 'Project not found',
@@ -22,6 +25,7 @@ type Dictionary = Record<TranslationKey, string>
 
 export const zhCN = {
   'app.title': 'skills-ui',
+  'app.documentTitle': 'skills-ui — 本机 Skill 管理器',
   'app.subtitle': '本机 Skill 资产',
   'nav.dashboard': '概览',
   'nav.skills': 'Skills',
@@ -29,6 +33,8 @@ export const zhCN = {
   'language.label': '界面语言',
   'language.zh': '中文',
   'language.en': 'English',
+  'language.switchToChinese': '切换界面语言为中文',
+  'language.switchToEnglish': '切换界面语言为 English',
   'skill.installProjectSuccess': '已将 {skill} 安装到 {project}。',
   'error.skillNotFound': '未找到 Skill',
   'error.projectNotFound': '未找到项目',

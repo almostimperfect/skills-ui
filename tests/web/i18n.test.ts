@@ -34,4 +34,13 @@ describe('known error localization', () => {
     expect(localizeKnownError('zh-CN', 'Custom safe diagnostic')).toBe('Custom safe diagnostic')
     expect(localizeKnownError('en', 'Skill not found')).toBe('Skill not found')
   })
+
+  test('localizes known status and maintenance reasons', () => {
+    expect(localizeKnownError('zh-CN', 'No reinstall source is available for this skill.'))
+      .toBe('该 Skill 没有可用于重新安装的来源。')
+    expect(localizeKnownError('zh-CN', 'No managed global installation exists for this skill.'))
+      .toBe('该 Skill 没有受管的全局安装。')
+    expect(localizeKnownError('zh-CN', 'Managed as a shared project-local install for codex and gemini-cli.'))
+      .toBe('作为 codex 和 gemini-cli 的共享项目安装进行管理。')
+  })
 })

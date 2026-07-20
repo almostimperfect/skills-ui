@@ -17,6 +17,24 @@ test('first visit follows browser language and remembers a manual switch', async
   await expect(page.locator('html')).toHaveAttribute('lang', 'en')
 })
 
+test('switching language preserves route and form content', async ({ page }) => {
+  await page.route('**/api/agents', route => route.fulfill({
+    status: 200, contentType: 'application/json', body: '["codex"]',
+  }))
+  await page.route('**/api/projects', route => route.fulfill({
+    status: 200, contentType: 'application/json', body: '[]',
+  }))
+
+  await page.goto('/projects')
+  await page.getByRole('button', { name: '添加项目' }).click()
+  await page.getByLabel('项目路径').fill('/tmp/example-project')
+  await page.getByRole('button', { name: '切换界面语言为 English' }).click()
+
+  await expect(page).toHaveURL(/\/projects$/)
+  await expect(page.getByLabel('Project path')).toHaveValue('/tmp/example-project')
+  await expect(page.getByRole('button', { name: 'Add', exact: true })).toBeVisible()
+})
+
 test('Chinese catalog localizes controls and known API errors', async ({ page }) => {
   await page.route('**/api/agents/global', route => route.fulfill({
     status: 200,

@@ -2,12 +2,14 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { getAgents, getProjects, registerProject, unregisterProject, updateProject } from '../api.js'
+import { useI18n } from '../i18n/I18nProvider.js'
 
 export default function Projects() {
+  const { localizeError, t } = useI18n()
   const [showAdd, setShowAdd] = useState(false)
   const [newPath, setNewPath] = useState('')
   const [newAgents, setNewAgents] = useState<string[]>(['codex'])
-  const [pathError, setPathError] = useState('')
+  const [pathError, setPathError] = useState(false)
   const qc = useQueryClient()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
@@ -22,7 +24,7 @@ export default function Projects() {
       setShowAdd(false)
       setNewPath('')
       setNewAgents(['codex'])
-      setPathError('')
+      setPathError(false)
       if (returnSkill) navigate(`/skills/${encodeURIComponent(returnSkill)}`)
     },
   })
@@ -46,12 +48,12 @@ export default function Projects() {
   return (
     <div className="p-8">
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Projects</h1>
+        <h1 className="text-2xl font-bold text-gray-900">{t('projects.title')}</h1>
         <button
           onClick={() => setShowAdd(true)}
           className="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-md hover:bg-indigo-700"
         >
-          Add Project
+          {t('projects.addProject')}
         </button>
       </div>
 
@@ -62,7 +64,7 @@ export default function Projects() {
             event.preventDefault()
             const isAbsolute = newPath.startsWith('/') || /^[A-Za-z]:[\\/]/.test(newPath)
             if (!isAbsolute) {
-              setPathError('Enter an absolute project path.')
+              setPathError(true)
               return
             }
             if (newPath && !addMutation.isPending) addMutation.mutate()
@@ -72,19 +74,19 @@ export default function Projects() {
           }}
         >
           <label htmlFor="project-path" className="mb-1 block text-sm font-medium text-slate-700">
-            Project path
+            {t('projects.pathLabel')}
           </label>
           <input
             id="project-path"
             autoFocus
             type="text"
             value={newPath}
-            onChange={e => { setNewPath(e.target.value); setPathError('') }}
+            onChange={e => { setNewPath(e.target.value); setPathError(false) }}
             placeholder="/absolute/path/to/project"
             className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 mb-3"
           />
           <p className="mb-3 text-xs leading-5 text-slate-500">
-            Registration does not move or delete project files. Only registered paths are scanned.
+            {t('projects.pathHelp')}
           </p>
           <div className="mb-3 flex flex-wrap gap-2">
             {supportedAgents?.map(agent => {
@@ -115,15 +117,15 @@ export default function Projects() {
               disabled={!newPath || addMutation.isPending}
               className="px-3 py-1.5 text-sm bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:opacity-50"
             >
-              {addMutation.isPending ? 'Adding...' : 'Add'}
+              {addMutation.isPending ? t('projects.adding') : t('projects.add')}
             </button>
             <button type="button" onClick={() => setShowAdd(false)} className="px-3 py-1.5 text-sm text-gray-600">
-              Cancel
+              {t('projects.cancel')}
             </button>
           </div>
           {(pathError || addMutation.isError) && (
             <p role="alert" className="mt-3 text-sm text-red-700">
-              {pathError || (addMutation.error instanceof Error ? addMutation.error.message : 'Failed to add project.')}
+              {pathError ? t('error.absolutePath') : localizeError(addMutation.error, 'projects.addError')}
             </p>
           )}
         </form>
@@ -131,13 +133,11 @@ export default function Projects() {
 
       {(removeMutation.isError || updateAgentsMutation.isError) && (
         <p role="alert" className="mb-4 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-          {(removeMutation.error ?? updateAgentsMutation.error) instanceof Error
-            ? (removeMutation.error ?? updateAgentsMutation.error as Error).message
-            : 'Failed to update the project.'}
+          {localizeError(removeMutation.error ?? updateAgentsMutation.error, 'projects.updateError')}
         </p>
       )}
 
-      {isLoading && <p className="text-gray-500">Loading...</p>}
+      {isLoading && <p className="text-gray-500">{t('projects.loading')}</p>}
 
       <div className="bg-white rounded-lg border border-gray-200 divide-y divide-gray-100">
         {projects?.map(project => (
@@ -175,17 +175,17 @@ export default function Projects() {
             </div>
             <button
               onClick={() => {
-                if (!window.confirm(`Remove ${project.name} from managed projects?`)) return
+                if (!window.confirm(t('projects.removeConfirm', { project: project.name }))) return
                 removeMutation.mutate(project.path)
               }}
               className="text-sm text-red-600 hover:text-red-800"
             >
-              Remove
+              {t('projects.remove')}
             </button>
           </div>
         ))}
         {projects?.length === 0 && (
-          <p className="text-center text-gray-400 py-8 text-sm">No projects registered</p>
+          <p className="text-center text-gray-400 py-8 text-sm">{t('projects.empty')}</p>
         )}
       </div>
     </div>

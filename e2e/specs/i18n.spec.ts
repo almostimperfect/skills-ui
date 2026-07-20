@@ -56,3 +56,53 @@ test('Chinese interface preserves an unknown safe API diagnostic', async ({ page
   await page.getByRole('button', { name: '安装', exact: true }).click()
   await expect(page.getByRole('alert')).toContainText('Custom safe diagnostic')
 })
+
+test('Chinese project registration localizes controls and validation', async ({ page }) => {
+  await page.route('**/api/agents', route => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: '["codex"]',
+  }))
+  await page.route('**/api/projects', route => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: '[]',
+  }))
+
+  await page.goto('/projects')
+  await page.getByRole('button', { name: '添加项目' }).click()
+  await expect(page.getByLabel('项目路径')).toBeFocused()
+  await page.getByLabel('项目路径').fill('./relative')
+  await page.getByRole('button', { name: '添加', exact: true }).click()
+  await expect(page.getByRole('alert')).toContainText('请输入项目的绝对路径。')
+})
+
+test('Chinese bulk uninstall confirmation explains complete impact', async ({ page }) => {
+  const projectPath = '/tmp/e2e/projects/app'
+  await page.route('**/api/projects/**', route => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify({
+      path: projectPath,
+      name: 'app',
+      agents: ['codex'],
+      skills: [{
+        id: 'basic-skill-id',
+        name: 'basic-skill',
+        description: 'A fixture Skill',
+        instances: [],
+        status: { codex: { state: 'project', canEnable: false, canDisable: true } },
+      }],
+    }),
+  }))
+
+  await page.goto(`/projects/${encodeURIComponent(projectPath)}`)
+  page.once('dialog', async dialog => {
+    expect(dialog.message()).toContain('从 app 卸载 1 个 Skill 的项目安装')
+    expect(dialog.message()).toContain('1 个 Agent 目标')
+    expect(dialog.message()).toContain('不会移除全局安装')
+    expect(dialog.message()).toContain('Skills 仍保留在目录中')
+    await dialog.dismiss()
+  })
+  await page.getByRole('button', { name: '卸载项目安装' }).click()
+})

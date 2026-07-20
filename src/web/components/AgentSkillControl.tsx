@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { disableSkill, enableSkill, type AgentSkillStatus } from '../api.js'
+import { useI18n } from '../i18n/I18nProvider.js'
 
 interface Props {
   skillId: string
@@ -12,11 +13,6 @@ interface Props {
   invalidateKey: unknown[]
 }
 
-function projectLabel(projectPath: string, projectName?: string): string {
-  if (projectName) return projectName
-  return projectPath.split(/[\\/]/).filter(Boolean).pop() ?? 'this project'
-}
-
 export default function AgentSkillControl({
   skillId,
   skillName,
@@ -26,6 +22,7 @@ export default function AgentSkillControl({
   status,
   invalidateKey,
 }: Props) {
+  const { localizeError, t } = useI18n()
   const qc = useQueryClient()
   const mutation = useMutation({
     mutationFn: (action: 'enable' | 'disable') => action === 'enable'
@@ -43,19 +40,22 @@ export default function AgentSkillControl({
   })
 
   const label = status.state === 'project'
-    ? 'Project install'
+    ? t('agentControl.projectInstall')
     : status.state === 'global'
-      ? 'Global install'
+      ? t('agentControl.globalInstall')
       : status.state === 'available'
-        ? 'Available'
-        : 'No source'
+        ? t('agentControl.available')
+        : t('agentControl.noSource')
   const active = status.state === 'project' || status.state === 'global'
   const group = Array.from(new Set([agent, ...(status.sharedWith ?? [])]))
-  const removalSummary = [
-    `Remove ${skillName} from ${projectLabel(projectPath, projectName)}?`,
-    `Agent group: ${group.join(', ')}.`,
-    'This removes the project installation only; the Skill remains in the catalog.',
-  ].join('\n\n')
+  const resolvedProjectName = projectName
+    ?? projectPath.split(/[\\/]/).filter(Boolean).pop()
+    ?? t('agentControl.thisProject')
+  const removalSummary = t('agentControl.removeConfirm', {
+    skill: skillName,
+    project: resolvedProjectName,
+    agents: group.join(', '),
+  })
 
   return (
     <div className="inline-flex min-w-40 flex-col items-center gap-1.5">
@@ -67,7 +67,11 @@ export default function AgentSkillControl({
               ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
               : 'border-gray-200 bg-gray-100 text-gray-500'
         }`}
-        title={[`${label} for ${agent}`, status.reason, status.sharedWith?.length ? `Shared with: ${status.sharedWith.join(', ')}` : undefined].filter(Boolean).join(' | ')}
+        title={[
+          t('agentControl.title', { status: label, agent }),
+          status.reason ? localizeError(new Error(status.reason), 'agentControl.error') : undefined,
+          status.sharedWith?.length ? t('agentControl.sharedWith', { agents: status.sharedWith.join(', ') }) : undefined,
+        ].filter(Boolean).join(' | ')}
       >
         {label}
       </span>
@@ -77,7 +81,7 @@ export default function AgentSkillControl({
           disabled={mutation.isPending}
           className="text-xs font-medium text-emerald-700 hover:underline disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {mutation.isPending ? 'Installing...' : 'Install'}
+          {mutation.isPending ? t('agentControl.installing') : t('agentControl.install')}
         </button>
       )}
       {status.canDisable && (
@@ -89,17 +93,17 @@ export default function AgentSkillControl({
           disabled={mutation.isPending}
           className="text-xs font-medium text-red-700 hover:underline disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {mutation.isPending ? 'Removing...' : 'Remove from project'}
+          {mutation.isPending ? t('agentControl.removing') : t('agentControl.remove')}
         </button>
       )}
       {status.state === 'global' && (
         <Link to={`/skills/${encodeURIComponent(skillId)}`} className="text-xs font-medium text-slate-600 hover:underline">
-          Manage global
+          {t('agentControl.manageGlobal')}
         </Link>
       )}
       {mutation.isError && (
         <span role="alert" className="max-w-48 text-xs text-red-700">
-          {mutation.error instanceof Error ? mutation.error.message : 'Agent update failed.'}
+          {localizeError(mutation.error, 'agentControl.error')}
         </span>
       )}
     </div>

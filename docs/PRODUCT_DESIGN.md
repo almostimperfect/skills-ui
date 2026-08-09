@@ -1,12 +1,14 @@
 # Product Design
 
-Status snapshot: 2026-05-06
+Status snapshot: 2026-08-09
 
 ## Product Goal
 
 `skills-ui` is a local asset manager for agent skills.
 
 It should not be only an installed-skill viewer. Its main job is to help a user maintain a durable machine-level skill catalog, understand where each skill is installed, and move skills between global and project scopes without losing provenance.
+
+The supported product surface is a desktop browser on the computer that owns the managed Skills. Phone and tablet layouts are not product requirements.
 
 ## Core Product Model
 
@@ -68,7 +70,7 @@ The product should support these actions as separate concepts:
 - restore or reinstall from the recorded source/archive
 - inspect update and drift state
 
-Current implementation already supports some of this, but the UI still presents many actions as global-first installation management.
+The current implementation separates catalog assets from installation instances and supports explicit project targets. Adding a new remote source still creates a global installation, so the impact must remain clear in that flow.
 
 ## Compatibility With `skills`
 
@@ -224,21 +226,20 @@ The project detail page should answer:
 
 ## Current Product Gaps
 
-Highest-priority gaps:
+Current non-blocking gaps and boundaries:
 
-- skills page is still closer to an installation list than an asset catalog
-- installing an asset into a specific target project still needs a clearer detail-page workflow
-- global remove and project remove are destructive without confirmation
-- catalog-only assets cannot be explicitly deleted
-- broken registered projects are skipped during reconcile but are not yet surfaced clearly in the UI
-- project add errors are not shown in the UI
-- mobile layout has a basic responsive structure, but tables and dense detail pages still need a full pass
+- destructive actions use native confirmation dialogs rather than application-owned impact previews
+- project display names are supported by the API but are not yet editable in the Web UI
+- project remote update checks remain limited by the provenance available in upstream lock metadata
+- reconciliation is user-triggered; there is no background scheduler or notification service
+- local paths remain visible where they are useful for diagnosis; there is no presentation/privacy mode
+- basic keyboard and feedback behavior is covered, but the product has not claimed full WCAG conformance
 
 ## Design Priorities
 
-1. Make asset versus installation semantics clear.
+1. Keep asset and installation semantics explicit.
 2. Keep `skills` CLI compatibility while allowing direct folder management for local/archive/manual assets.
 3. Make external CLI changes recoverable through reconcile.
-4. Add safe actions for install, uninstall, promote, and delete.
-5. Surface project errors without blocking the whole catalog.
-6. Improve UI density and responsive behavior after the product model is clear.
+4. Keep install, uninstall, promote, recover, and forget actions explicit and reversible where possible.
+5. Surface project and source errors without blocking the whole catalog.
+6. Improve desktop information density, privacy controls, and accessibility.

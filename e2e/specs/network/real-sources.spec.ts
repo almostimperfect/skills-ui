@@ -73,7 +73,7 @@ test.describe('@network real remote sources', () => {
 
   test('@network installs an owner/repository shorthand source', async () => {
     await withIsolatedHome(async home => {
-      const result = await run('node', [CLI_ENTRY, 'add', 'almostimperfect/codex-ppt-skills'], home)
+      const result = await run('node', [CLI_ENTRY, 'add', 'op7418/Humanizer-zh'], home)
 
       expect(result.code, result.stderr).toBe(0)
       expect((await installedSkillNames(home)).length).toBeGreaterThan(0)

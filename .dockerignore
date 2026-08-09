@@ -24,3 +24,11 @@ skills-lock.json
 playwright-report
 test-results
 e2e/output
+.development
+.DEVELOPMENT
+AGENTS.md
+agents.md
+AGENT.md
+agent.md
+CLAUDE.md
+GEMINI.md

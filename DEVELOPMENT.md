@@ -1,10 +1,11 @@
 # Development
 
-Status snapshot: 2026-05-07
+Status snapshot: 2026-08-09
 
 ## Requirements
 
 - Node.js 18+
+- Docker for the containerized unit and browser test tiers
 
 ## Setup
 
@@ -19,6 +20,9 @@ npm install
 ```bash
 npm test             # run all tests
 npm run build        # compile server TS + bundle web
+npm run test:docker  # clean install + unit/integration tests in Docker
+npm run test:e2e     # deterministic Playwright suite, runtime network disabled
+npm run test:e2e:network # explicit real-source smoke tests in Docker
 
 npm run dev:server   # backend on http://localhost:3456
 npm run dev:web      # Vite dev server on http://localhost:5173
@@ -34,7 +38,7 @@ npm run dev:web      # Vite dev server on http://localhost:5173
 
 ## R&D Direction
 
-Product-facing design notes live in [docs/PRODUCT_DESIGN.md](./docs/PRODUCT_DESIGN.md), and the lightweight prioritized backlog lives in [docs/TODOLIST.md](./docs/TODOLIST.md).
+Product-facing design notes live in [docs/PRODUCT_DESIGN.md](./docs/PRODUCT_DESIGN.md). Work prioritization and private development-control records stay outside the tracked public tree, normally under the ignored `.development/` directory.
 
 The project is a local asset manager that remains compatible with `skills` without delegating all state to that CLI.
 
@@ -202,17 +206,22 @@ Implemented:
 - CLI support for `check`, `update`, `split-global`
 - React UI for maintenance and split-global
 - removal of the old `state.ts` model
+- stable Skill identity and alias redirects across reconciliation
+- explicit project-target installation and destructive-action confirmation
+- Dashboard health summary and on-demand reconciliation
+- modified-copy recovery and catalog-only Skill deletion
+- English and Chinese interfaces with a persistent language switcher
+- deterministic Docker browser tests plus an opt-in real-network tier
 
-Validation status:
+Validation commands:
 
-- `npm run build:server` passes
-- `npm run build:web` passes
-- `npm test` passes
+- `npm run build`
+- `npm test`
+- `npm run test:docker`
+- `npm run test:e2e`
+- `npm run test:e2e:network` (explicit opt-in; depends on external repositories)
 
-As of 2026-05-07:
-
-- 10 test files
-- 61 tests passing
+The deterministic Docker E2E tier runs without runtime network access and without host bind mounts. See [docs/testing/network-source-smoke-test-v1.1.md](./docs/testing/network-source-smoke-test-v1.1.md) for the separate real-network boundary.
 
 ## File Map
 
@@ -306,10 +315,9 @@ Everything is on-demand via API/CLI/UI refresh.
 
 Good follow-up directions:
 
-- expose maintenance summary on the top-level skills list page
-- add project settings UI for editing managed agents and project metadata
-- add explicit reconcile endpoint / CLI command
-- add "reinstall project skill" action for drift recovery
+- add project display-name editing and clearer settings save feedback
+- replace native confirmation dialogs with application-owned impact previews
+- add an optional privacy mode that masks local paths until requested
 - surface more precise source labels in UI:
   - github
   - well-known
@@ -317,6 +325,7 @@ Good follow-up directions:
   - local
 - record more provenance for project installs if upstream `skills` expands local lock metadata in future versions
 - add optional background refresh/update notifications if the product grows beyond manual admin workflows
+- complete a screen-reader, zoom, focus-order, and color-contrast audit
 
 ## Historical Note
 

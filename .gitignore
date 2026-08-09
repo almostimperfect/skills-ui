@@ -23,6 +23,7 @@ coverage/
 .playwright-mcp/
 playwright-report/
 test-results/
+e2e/output/
 
 # Local scratch space
 temp/
@@ -44,9 +45,20 @@ yarn-error.log*
 # Git worktrees (local dev only)
 .worktrees/
 
+# Private development control plane (local to this checkout)
+.development/
+.DEVELOPMENT/
+
+# Repository-local agent instructions (private for this project)
+/AGENTS.md
+/agents.md
+/AGENT.md
+/agent.md
+/CLAUDE.md
+/GEMINI.md
+
 # AI coding tool configs (personal, local)
 .skills-ui/
-docs/superpowers/
 .claude/
 .superpowers/
 .gemini/

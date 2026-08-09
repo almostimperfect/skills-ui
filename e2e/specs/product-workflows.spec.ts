@@ -29,7 +29,7 @@ async function routeSkillsList(page: import('@playwright/test').Page, skills = [
   }))
 }
 
-test('UX-005/006: failed global uninstall shows the server message after confirmation', async ({ page }) => {
+test('failed global uninstall shows the server message after confirmation', async ({ page }) => {
   await routeSkillsList(page)
   await page.route('**/api/skills/basic-skill-id', route =>
     route.request().method() === 'DELETE'
@@ -48,7 +48,7 @@ test('UX-005/006: failed global uninstall shows the server message after confirm
   expect(confirmed).toBe(true)
 })
 
-test('UX-007: Install new Skill explains global effects and supports keyboard control', async ({ page }) => {
+test('Install new Skill explains global effects and supports keyboard control', async ({ page }) => {
   await routeSkillsList(page, [])
   await page.route('**/api/skills', route =>
     route.request().method() === 'POST'
@@ -72,7 +72,7 @@ test('UX-007: Install new Skill explains global effects and supports keyboard co
   await expect(page.getByRole('alert')).not.toContainText('422')
 })
 
-test('UX-004/005: project removal confirms and reports a failed DELETE', async ({ page }) => {
+test('project removal confirms and reports a failed DELETE', async ({ page }) => {
   await page.route('**/api/agents', route => route.fulfill({
     status: 200,
     contentType: 'application/json',
@@ -100,7 +100,7 @@ test('UX-004/005: project removal confirms and reports a failed DELETE', async (
   expect(confirmed).toBe(true)
 })
 
-test('UX-005/007: Add Project supports keyboard control and visible validation errors', async ({ page }) => {
+test('Add Project supports keyboard control and visible validation errors', async ({ page }) => {
   let postRequests = 0
   await page.route('**/api/agents', route => route.fulfill({
     status: 200,
@@ -146,7 +146,7 @@ test('project registration returns to the requesting Skill detail', async ({ pag
   await expect(page).toHaveURL(/\/skills\/basic-skill-id$/)
 })
 
-test('UX-001: an unknown asset renders a not-found state', async ({ page }) => {
+test('an unknown asset renders a not-found state', async ({ page }) => {
   await page.route('**/api/skills/ghost**', route => route.fulfill({
     status: 404,
     contentType: 'application/json',
@@ -230,7 +230,7 @@ test('project Skill state is inert and removal is an explicit confirmed action',
   await expect.poll(() => disableRequests).toBe(1)
 })
 
-test('UX-009: a failed explicit project removal renders feedback', async ({ page }) => {
+test('a failed explicit project removal renders feedback', async ({ page }) => {
   await page.route('**/api/projects/**', route => route.fulfill({
     status: 200,
     contentType: 'application/json',
@@ -375,7 +375,7 @@ test('catalog-only Skill can be forgotten after confirmation', async ({ page }) 
   await expect(page).toHaveURL(/\/skills$/)
 })
 
-test('UX-010: bulk uninstall shows progress and partial failure count', async ({ page }) => {
+test('bulk uninstall shows progress and partial failure count', async ({ page }) => {
   await page.route('**/api/projects/**', route => route.fulfill({
     status: 200,
     contentType: 'application/json',
@@ -411,7 +411,7 @@ test('UX-010: bulk uninstall shows progress and partial failure count', async ({
   await expect(page.getByRole('alert')).toContainText('1 change failed')
 })
 
-test('UX-008: dashboard distinguishes API failure from loading', async ({ page }) => {
+test('dashboard distinguishes API failure from loading', async ({ page }) => {
   await page.route('**/api/overview', route => route.fulfill({
     status: 503,
     contentType: 'application/json',

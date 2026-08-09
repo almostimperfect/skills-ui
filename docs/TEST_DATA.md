@@ -2,6 +2,8 @@
 
 This project uses the `xtest-` prefix for disposable manual QA skills. The prefix keeps test data visually separate from normal user skills and makes cleanup safe.
 
+> **Host-impact warning:** `npm run seed:xtest` is a manual host test helper. It writes disposable Skills under the current user's global Skill directories, updates `~/.skills-ui/config.json`, and creates ignored `.xtest/` projects. Run `npm run cleanup:xtest` afterward. For tests that must not touch host Skill data, use the Docker commands in `DEVELOPMENT.md` instead.
+
 ## Seed
 
 ```bash

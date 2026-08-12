@@ -1,6 +1,7 @@
 // tests/server/projects.test.ts
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import request from 'supertest'
+import { authenticatedRequest } from './session.js'
 
 const mockRegistry = {
   listProjects: vi.fn(),
@@ -48,7 +49,8 @@ describe('GET /api/projects', () => {
       { path: '/home/user/proj', name: 'proj', agents: ['claude-code'] },
     ])
     const app = createApp()
-    const res = await request(app).get('/api/projects')
+    const session = await authenticatedRequest(app)
+    const res = await session.get('/api/projects')
     expect(res.status).toBe(200)
     expect(res.body[0].name).toBe('proj')
   })
@@ -59,20 +61,23 @@ describe('POST /api/projects', () => {
     const proj = { path: '/home/user/proj', name: 'proj', agents: ['claude-code'] }
     mockRegistry.registerProject.mockResolvedValue(proj)
     const app = createApp()
-    const res = await request(app).post('/api/projects').send({ path: '/home/user/proj' })
+    const session = await authenticatedRequest(app)
+    const res = await session.post('/api/projects').send({ path: '/home/user/proj' })
     expect(res.status).toBe(201)
     expect(res.body.name).toBe('proj')
   })
 
   it('returns 400 when path is missing', async () => {
     const app = createApp()
-    const res = await request(app).post('/api/projects').send({})
+    const session = await authenticatedRequest(app)
+    const res = await session.post('/api/projects').send({})
     expect(res.status).toBe(400)
   })
 
   it('returns 400 when path is relative', async () => {
     const app = createApp()
-    const res = await request(app).post('/api/projects').send({ path: 'relative/path' })
+    const session = await authenticatedRequest(app)
+    const res = await session.post('/api/projects').send({ path: 'relative/path' })
     expect(res.status).toBe(400)
   })
 })
@@ -81,8 +86,9 @@ describe('DELETE /api/projects/:projectPath', () => {
   it('unregisters project and cleans up state', async () => {
     mockRegistry.unregisterProject.mockResolvedValue(undefined)
     const app = createApp()
+    const session = await authenticatedRequest(app)
     const encoded = encodeURIComponent('/home/user/proj')
-    const res = await request(app).delete(`/api/projects/${encoded}`)
+    const res = await session.delete(`/api/projects/${encoded}`)
     expect(res.status).toBe(204)
     expect(mockInventory.reconcile).toHaveBeenCalled()
   })
@@ -114,8 +120,9 @@ describe('GET /api/projects/:projectPath', () => {
     ])
 
     const app = createApp()
+    const session = await authenticatedRequest(app)
     const encoded = encodeURIComponent('/home/user/proj')
-    const res = await request(app).get(`/api/projects/${encoded}`)
+    const res = await session.get(`/api/projects/${encoded}`)
     expect(res.status).toBe(200)
     expect(res.body.skills[0].id).toBe('tdd-workflow-1')
     expect(res.body.skills[0].status['claude-code'].state).toBe('project')
@@ -124,8 +131,9 @@ describe('GET /api/projects/:projectPath', () => {
   it('returns 404 for unknown project', async () => {
     mockRegistry.getProject.mockResolvedValue(undefined)
     const app = createApp()
+    const session = await authenticatedRequest(app)
     const encoded = encodeURIComponent('/unknown/path')
-    const res = await request(app).get(`/api/projects/${encoded}`)
+    const res = await session.get(`/api/projects/${encoded}`)
     expect(res.status).toBe(404)
   })
 })
@@ -135,8 +143,9 @@ describe('PATCH /api/projects/:projectPath', () => {
     const updated = { path: '/home/user/proj', name: 'new-name', agents: ['claude-code'] }
     mockRegistry.updateProject.mockResolvedValue(updated)
     const app = createApp()
+    const session = await authenticatedRequest(app)
     const encoded = encodeURIComponent('/home/user/proj')
-    const res = await request(app).patch(`/api/projects/${encoded}`).send({ name: 'new-name' })
+    const res = await session.patch(`/api/projects/${encoded}`).send({ name: 'new-name' })
     expect(res.status).toBe(200)
     expect(res.body.name).toBe('new-name')
   })
@@ -145,8 +154,9 @@ describe('PATCH /api/projects/:projectPath', () => {
     const updated = { path: '/home/user/proj', name: 'proj', agents: ['codex'] }
     mockRegistry.updateProject.mockResolvedValue(updated)
     const app = createApp()
+    const session = await authenticatedRequest(app)
     const encoded = encodeURIComponent('/home/user/proj')
-    const res = await request(app).patch(`/api/projects/${encoded}`).send({ agents: ['codex'] })
+    const res = await session.patch(`/api/projects/${encoded}`).send({ agents: ['codex'] })
     expect(res.status).toBe(200)
     expect(res.body.name).toBe('proj')
     expect(mockRegistry.updateProject).toHaveBeenCalledWith('/home/user/proj', { name: undefined, agents: ['codex'] })

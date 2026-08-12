@@ -11,6 +11,8 @@ const SKILLS_BIN = '/app/node_modules/.bin/skills'
 const NETWORK_TIMEOUT = 300_000
 const CONNECTIVITY_TIMEOUT = 5_000
 const SAFE_PATH = '/usr/local/bin:/usr/bin:/bin'
+const SERVICE_ORIGIN = 'http://127.0.0.1:3456'
+const CSRF_HEADER = 'X-Skills-UI-CSRF'
 
 const NETWORK_ENV_KEYS = [
   'HTTP_PROXY',
@@ -272,13 +274,32 @@ test.describe('@network real remote sources', () => {
   })
 
   test('@network API installation uses the container-only HOME', async ({ request }) => {
+    const sessionResponse = await request.post('/api/session', {
+      data: {},
+      headers: {
+        'Content-Type': 'application/json',
+        Origin: SERVICE_ORIGIN,
+      },
+    })
+    const sessionBody = await sessionResponse.text()
+    expect(sessionResponse.status(), sessionBody).toBe(200)
+    const { csrfToken } = JSON.parse(sessionBody) as { csrfToken?: string }
+    expect(csrfToken).toMatch(/^[A-Za-z0-9_-]{43}$/)
+
     const response = await request.post('/api/skills', {
       data: { source: 'https://github.com/op7418/Humanizer-zh.git' },
+      headers: {
+        [CSRF_HEADER]: csrfToken!,
+        'Content-Type': 'application/json',
+        Origin: SERVICE_ORIGIN,
+      },
       timeout: NETWORK_TIMEOUT,
     })
 
     expect(response.status(), await response.text()).toBe(201)
-    const skills = await request.get('/api/skills')
+    const skills = await request.get('/api/skills', {
+      headers: { [CSRF_HEADER]: csrfToken! },
+    })
     expect(skills.status()).toBe(200)
     const body = await skills.json() as Array<{
       name?: string

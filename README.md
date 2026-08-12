@@ -43,8 +43,15 @@ npm unlink -g skills-ui
 
 ```bash
 skills-ui serve
-# Opens at http://localhost:3456
+# Opens at http://127.0.0.1:3456
 ```
+
+The Web service listens only on IPv4 loopback. Its management API requires an
+in-memory browser session plus same-origin request proof, so another website or
+a device on the local network cannot invoke management actions. This is a
+browser-origin boundary, not native-client authentication: another process on
+the same host that can reach loopback can reproduce the bootstrap request and
+establish its own session. Operating-system isolation is a separate boundary.
 
 ### CLI
 

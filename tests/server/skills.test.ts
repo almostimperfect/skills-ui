@@ -1,6 +1,7 @@
 // tests/server/skills.test.ts
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import request from 'supertest'
+import { authenticatedRequest } from './session.js'
 
 const { MockSkillsCliError } = vi.hoisted(() => ({
   MockSkillsCliError: class MockSkillsCliError extends Error {},
@@ -73,7 +74,8 @@ describe('GET /api/skills', () => {
       { id: 'tdd-workflow-1', name: 'tdd-workflow', description: 'TDD', source: '', reinstallSource: '', reinstallable: true, sourceType: 'github', instances: [] },
     ])
     const app = createApp()
-    const res = await request(app).get('/api/skills')
+    const session = await authenticatedRequest(app)
+    const res = await session.get('/api/skills')
     expect(res.status).toBe(200)
     expect(res.body[0].name).toBe('tdd-workflow')
   })
@@ -83,14 +85,18 @@ describe('Skill recovery and catalog deletion', () => {
   it('reinstalls a project copy from the recorded source', async () => {
     mockRegistryInstance.listProjects.mockResolvedValue([{ path: '/synthetic/project', name: 'project', agents: ['codex'] }])
     mockInventoryInstance.resolveSkillRef.mockResolvedValue({ id: 'skill-id', name: 'skill', instances: [] })
-    const res = await request(createApp()).post('/api/skills/skill-id/reinstall-project').send({ projectPath: '/synthetic/project' })
+    const app = createApp()
+    const session = await authenticatedRequest(app)
+    const res = await session.post('/api/skills/skill-id/reinstall-project').send({ projectPath: '/synthetic/project' })
     expect(res.status).toBe(200)
     expect(mockInventoryInstance.reinstallProjectSkill).toHaveBeenCalledWith('skill-id', '/synthetic/project', expect.any(Array))
   })
 
   it('forgets a catalog-only Skill', async () => {
     mockInventoryInstance.resolveSkillRef.mockResolvedValue({ id: 'skill-id', name: 'skill', instances: [] })
-    const res = await request(createApp()).delete('/api/skills/skill-id/catalog')
+    const app = createApp()
+    const session = await authenticatedRequest(app)
+    const res = await session.delete('/api/skills/skill-id/catalog')
     expect(res.status).toBe(204)
     expect(mockInventoryInstance.forgetSkill).toHaveBeenCalledWith('skill-id', [])
   })
@@ -100,14 +106,16 @@ describe('POST /api/skills', () => {
   it('adds a global skill through inventory and returns 201', async () => {
     mockInventoryInstance.addGlobalSkillFromSource.mockResolvedValue(undefined)
     const app = createApp()
-    const res = await request(app).post('/api/skills').send({ source: 'owner/repo' })
+    const session = await authenticatedRequest(app)
+    const res = await session.post('/api/skills').send({ source: 'owner/repo' })
     expect(res.status).toBe(201)
     expect(mockInventoryInstance.addGlobalSkillFromSource).toHaveBeenCalledWith('owner/repo', [], ['codex'])
   })
 
   it('returns 400 when source is missing', async () => {
     const app = createApp()
-    const res = await request(app).post('/api/skills').send({})
+    const session = await authenticatedRequest(app)
+    const res = await session.post('/api/skills').send({})
     expect(res.status).toBe(400)
   })
 
@@ -117,7 +125,8 @@ describe('POST /api/skills', () => {
     ))
 
     const app = createApp()
-    const res = await request(app).post('/api/skills').send({ source: 'owner/private' })
+    const session = await authenticatedRequest(app)
+    const res = await session.post('/api/skills').send({ source: 'owner/private' })
     const body = JSON.stringify(res.body)
 
     expect(res.status).toBe(422)
@@ -143,7 +152,8 @@ describe('GET /api/skills/:name', () => {
     })
 
     const app = createApp()
-    const res = await request(app).get('/api/skills/old-id')
+    const session = await authenticatedRequest(app)
+    const res = await session.get('/api/skills/old-id')
 
     expect(res.status).toBe(200)
     expect(mockInventoryInstance.resolveSkillRef).toHaveBeenCalledWith('old-id', [])
@@ -173,7 +183,8 @@ describe('GET /api/skills/:name', () => {
     })
 
     const app = createApp()
-    const res = await request(app).get('/api/skills/tdd-workflow')
+    const session = await authenticatedRequest(app)
+    const res = await session.get('/api/skills/tdd-workflow')
     expect(res.status).toBe(200)
     expect(res.body.name).toBe('tdd-workflow')
     expect(res.body.status['/home/user/proj']['claude-code'].state).toBe('project')
@@ -194,7 +205,8 @@ describe('DELETE /api/skills/:name', () => {
       instances: [{ scope: 'global', path: '/home/user/.agents/skills/tdd-workflow', agents: [] }],
     })
     const app = createApp()
-    const res = await request(app).delete('/api/skills/tdd-workflow')
+    const session = await authenticatedRequest(app)
+    const res = await session.delete('/api/skills/tdd-workflow')
     expect(res.status).toBe(204)
     expect(mockInventoryInstance.removeGlobalSkill).toHaveBeenCalledWith('tdd-workflow-1', [])
   })
@@ -222,7 +234,8 @@ describe('GET /api/skills/:name/maintenance', () => {
     })
 
     const app = createApp()
-    const res = await request(app).get('/api/skills/tdd-workflow/maintenance')
+    const session = await authenticatedRequest(app)
+    const res = await session.get('/api/skills/tdd-workflow/maintenance')
     expect(res.status).toBe(200)
     expect(res.body.update.status).toBe('up-to-date')
   })
@@ -242,7 +255,8 @@ describe('POST /api/skills/:name/update', () => {
     })
 
     const app = createApp()
-    const res = await request(app).post('/api/skills/tdd-workflow/update')
+    const session = await authenticatedRequest(app)
+    const res = await session.post('/api/skills/tdd-workflow/update')
     expect(res.status).toBe(200)
     expect(mockInventoryInstance.updateGlobalSkill).toHaveBeenCalledWith('tdd-workflow-1', [], ['codex'])
   })
@@ -262,7 +276,8 @@ describe('POST /api/skills/:name/install-global', () => {
     })
 
     const app = createApp()
-    const res = await request(app).post('/api/skills/tdd-workflow/install-global')
+    const session = await authenticatedRequest(app)
+    const res = await session.post('/api/skills/tdd-workflow/install-global')
     expect(res.status).toBe(200)
     expect(mockInventoryInstance.installGlobalSkill).toHaveBeenCalledWith('tdd-workflow-1', [], ['codex'])
   })
@@ -280,7 +295,8 @@ describe('POST /api/skills/:name/install-global', () => {
     })
 
     const app = createApp()
-    const res = await request(app).post('/api/skills/tdd-workflow/install-global')
+    const session = await authenticatedRequest(app)
+    const res = await session.post('/api/skills/tdd-workflow/install-global')
     expect(res.status).toBe(409)
   })
 })
@@ -299,7 +315,8 @@ describe('POST /api/skills/:name/split-global', () => {
     })
 
     const app = createApp()
-    const res = await request(app).post('/api/skills/tdd-workflow/split-global')
+    const session = await authenticatedRequest(app)
+    const res = await session.post('/api/skills/tdd-workflow/split-global')
     expect(res.status).toBe(200)
     expect(mockInventoryInstance.splitGlobalSkill).toHaveBeenCalledWith('tdd-workflow-1', [])
   })

@@ -1,3 +1,11 @@
+import {
+  CSRF_HEADER,
+  SESSION_REQUIRED_HEADER,
+  SessionBootstrapError,
+  getLocalSession,
+  invalidateLocalSession,
+} from './session.js'
+
 const BASE = '/api'
 
 export class ApiError extends Error {
@@ -28,6 +36,41 @@ async function expectOk(res: Response): Promise<void> {
 async function json<T>(res: Response): Promise<T> {
   await expectOk(res)
   return res.json() as Promise<T>
+}
+
+const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS'])
+
+async function apiFetch(input: string, init: RequestInit = {}, retrySession = true): Promise<Response> {
+  let session
+  try {
+    session = await getLocalSession()
+  } catch (error) {
+    if (error instanceof SessionBootstrapError) {
+      throw new ApiError(error.status, error.message)
+    }
+    throw error
+  }
+
+  const method = (init.method ?? 'GET').toUpperCase()
+  const headers = new Headers(init.headers)
+  headers.set(CSRF_HEADER, session.csrfToken)
+  if (!SAFE_METHODS.has(method)) headers.set('Content-Type', 'application/json')
+
+  const response = await fetch(input, {
+    ...init,
+    method,
+    headers,
+    credentials: 'same-origin',
+    cache: 'no-store',
+  })
+
+  const sessionRejected = response.headers.get(SESSION_REQUIRED_HEADER) === '1'
+  if (retrySession && (response.status === 401 || response.status === 403) && sessionRejected) {
+    await invalidateLocalSession(session)
+    return apiFetch(input, init, false)
+  }
+
+  return response
 }
 
 export interface Skill {
@@ -110,105 +153,105 @@ export interface ProductOverview {
 }
 
 export const getOverview = () =>
-  fetch(`${BASE}/overview`).then(r => json<ProductOverview>(r))
+  apiFetch(`${BASE}/overview`).then(r => json<ProductOverview>(r))
 
 export const reconcileOverview = () =>
-  fetch(`${BASE}/overview/reconcile`, { method: 'POST' }).then(r => json<ProductOverview>(r))
+  apiFetch(`${BASE}/overview/reconcile`, { method: 'POST' }).then(r => json<ProductOverview>(r))
 
 // Skills
 export const getSkills = () =>
-  fetch(`${BASE}/skills`).then(r => json<Skill[]>(r))
+  apiFetch(`${BASE}/skills`).then(r => json<Skill[]>(r))
 
 export const getSkill = (id: string) =>
-  fetch(`${BASE}/skills/${encodeURIComponent(id)}`).then(r => json<SkillWithStatus>(r))
+  apiFetch(`${BASE}/skills/${encodeURIComponent(id)}`).then(r => json<SkillWithStatus>(r))
 
 export const addSkill = (source: string) =>
-  fetch(`${BASE}/skills`, {
+  apiFetch(`${BASE}/skills`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ source }),
   }).then(r => json<{ ok: boolean }>(r))
 
 export const removeSkill = (id: string) =>
-  fetch(`${BASE}/skills/${encodeURIComponent(id)}`, { method: 'DELETE' }).then(expectOk)
+  apiFetch(`${BASE}/skills/${encodeURIComponent(id)}`, { method: 'DELETE' }).then(expectOk)
 
 export const enableSkill = (id: string, projectPath: string, agent: string) =>
-  fetch(`${BASE}/skills/${encodeURIComponent(id)}/enable`, {
+  apiFetch(`${BASE}/skills/${encodeURIComponent(id)}/enable`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ projectPath, agent }),
   }).then(r => json<{ ok: boolean }>(r))
 
 export const disableSkill = (id: string, projectPath: string, agent: string) =>
-  fetch(`${BASE}/skills/${encodeURIComponent(id)}/disable`, {
+  apiFetch(`${BASE}/skills/${encodeURIComponent(id)}/disable`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ projectPath, agent }),
   }).then(r => json<{ ok: boolean }>(r))
 
 export const splitGlobalSkill = (id: string) =>
-  fetch(`${BASE}/skills/${encodeURIComponent(id)}/split-global`, {
+  apiFetch(`${BASE}/skills/${encodeURIComponent(id)}/split-global`, {
     method: 'POST',
   }).then(r => json<{ ok: boolean }>(r))
 
 export const getSkillMaintenance = (id: string) =>
-  fetch(`${BASE}/skills/${encodeURIComponent(id)}/maintenance`).then(r => json<SkillMaintenance>(r))
+  apiFetch(`${BASE}/skills/${encodeURIComponent(id)}/maintenance`).then(r => json<SkillMaintenance>(r))
 
 export const updateSkill = (id: string) =>
-  fetch(`${BASE}/skills/${encodeURIComponent(id)}/update`, {
+  apiFetch(`${BASE}/skills/${encodeURIComponent(id)}/update`, {
     method: 'POST',
   }).then(r => json<{ ok: boolean }>(r))
 
 export const installGlobalSkill = (id: string) =>
-  fetch(`${BASE}/skills/${encodeURIComponent(id)}/install-global`, {
+  apiFetch(`${BASE}/skills/${encodeURIComponent(id)}/install-global`, {
     method: 'POST',
   }).then(r => json<{ ok: boolean }>(r))
 
 export const reinstallProjectSkill = (id: string, projectPath: string) =>
-  fetch(`${BASE}/skills/${encodeURIComponent(id)}/reinstall-project`, {
+  apiFetch(`${BASE}/skills/${encodeURIComponent(id)}/reinstall-project`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ projectPath }),
   }).then(r => json<{ ok: boolean }>(r))
 
 export const forgetCatalogSkill = (id: string) =>
-  fetch(`${BASE}/skills/${encodeURIComponent(id)}/catalog`, { method: 'DELETE' }).then(expectOk)
+  apiFetch(`${BASE}/skills/${encodeURIComponent(id)}/catalog`, { method: 'DELETE' }).then(expectOk)
 
 // Projects
 export const getProjects = () =>
-  fetch(`${BASE}/projects`).then(r => json<Project[]>(r))
+  apiFetch(`${BASE}/projects`).then(r => json<Project[]>(r))
 
 export const getProject = (projectPath: string) =>
-  fetch(`${BASE}/projects/${encodeURIComponent(projectPath)}`).then(r =>
+  apiFetch(`${BASE}/projects/${encodeURIComponent(projectPath)}`).then(r =>
     json<ProjectWithMatrix>(r)
   )
 
 export const registerProject = (path: string, agents?: string[]) =>
-  fetch(`${BASE}/projects`, {
+  apiFetch(`${BASE}/projects`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ path, agents }),
   }).then(r => json<Project>(r))
 
 export const updateProject = (projectPath: string, updates: { name?: string; agents?: string[] }) =>
-  fetch(`${BASE}/projects/${encodeURIComponent(projectPath)}`, {
+  apiFetch(`${BASE}/projects/${encodeURIComponent(projectPath)}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(updates),
   }).then(r => json<Project>(r))
 
 export const unregisterProject = (projectPath: string) =>
-  fetch(`${BASE}/projects/${encodeURIComponent(projectPath)}`, { method: 'DELETE' }).then(expectOk)
+  apiFetch(`${BASE}/projects/${encodeURIComponent(projectPath)}`, { method: 'DELETE' }).then(expectOk)
 
 // Agents
 export const getAgents = () =>
-  fetch(`${BASE}/agents`).then(r => json<string[]>(r))
+  apiFetch(`${BASE}/agents`).then(r => json<string[]>(r))
 
 export const getGlobalAgents = () =>
-  fetch(`${BASE}/agents/global`).then(r => json<GlobalAgentConfig>(r))
+  apiFetch(`${BASE}/agents/global`).then(r => json<GlobalAgentConfig>(r))
 
 export const updateGlobalAgents = (agents: string[]) =>
-  fetch(`${BASE}/agents/global`, {
+  apiFetch(`${BASE}/agents/global`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ agents }),

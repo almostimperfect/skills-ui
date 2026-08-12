@@ -27,7 +27,7 @@ PROXY_HOST="skills-ui-egress-proxy"
 TEST_HOME="/tmp/skills-ui-e2e-$RUN_ID/home"
 PROXY_HOME="/tmp/skills-ui-e2e-proxy-$RUN_ID/home"
 CANARY_VALUE="skills-ui-host-canary-$RUN_ID"
-CONTEXT_CANARY_PATH="$REPO_ROOT/src/.skills-ui-context-canary-$RUN_ID"
+CONTEXT_CANARY_PATH="$REPO_ROOT/.skills-ui-context-canary-$RUN_ID"
 SAFE_PATH="/usr/local/bin:/usr/bin:/bin"
 
 assert_safe_npmrc() {

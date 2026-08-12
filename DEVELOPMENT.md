@@ -47,9 +47,20 @@ npm run test:docker  # clean install + unit/integration tests in Docker
 npm run test:e2e     # deterministic Playwright suite, runtime network disabled
 npm run test:e2e:network # owner-authorized real-source smoke tests in Docker
 
-npm run dev:server   # backend on http://localhost:3456
-npm run dev:web      # Vite dev server on http://localhost:5173
+npm run dev:server   # backend on http://127.0.0.1:3456
+npm run dev:web      # Vite dev server on http://127.0.0.1:5173
 ```
+
+The production server binds only `127.0.0.1`. It rejects unexpected Host
+values, protects every management API read and write with a process-local
+browser session, and additionally requires exact same-origin JSON requests for
+state changes. The minimal `/api/session` bootstrap is the deliberate exception.
+The development proxy rewrites only the fixed loopback development origin to
+that canonical backend origin. These controls address LAN exposure, DNS
+rebinding, cross-origin browser requests, and unbound HTTP calls; they are not
+native-client authentication or an operating-system sandbox. A same-host
+process can reproduce the bootstrap request and establish its own session, and
+a compromised browser extension or same-origin injected code remains trusted.
 
 ## Stack
 

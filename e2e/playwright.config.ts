@@ -21,7 +21,7 @@ export default defineConfig({
   },
   webServer: {
     command: 'mkdir -p "$HOME" && node /app/dist/cli/index.js serve --port 3456',
-    url: 'http://127.0.0.1:3456/api/agents',
+    url: 'http://127.0.0.1:3456/healthz',
     reuseExistingServer: false,
     timeout: 30_000,
   },

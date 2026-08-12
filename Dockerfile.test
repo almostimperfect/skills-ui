@@ -1,10 +1,38 @@
-FROM node:20-slim
+FROM node:20.20.2-slim@sha256:2cf067cfed83d5ea958367df9f966191a942351a2df77d6f0193e162b5febfc0
+
+RUN test "$(node --version)" = "v20.20.2" \
+    && test "$(npm --version)" = "10.8.2" \
+    && test "$(id -u node)" -ne 0 \
+    && install -d -o node -g node /app
 
 WORKDIR /app
+USER node
 
-COPY package.json package-lock.json ./
-RUN npm ci && test -x node_modules/.bin/vitest
+# Validate the immutable dependency graph before the only networked project
+# step. No application source or local development material is present here.
+COPY --chown=node:node package.json package-lock.json .npmrc ./
+COPY --chown=node:node security/npm-policy.json security/
+COPY --chown=node:node scripts/check-lock-policy.mjs scripts/
+RUN --network=none env \
+      -u HTTP_PROXY -u HTTPS_PROXY -u FTP_PROXY -u ALL_PROXY -u NO_PROXY \
+      -u http_proxy -u https_proxy -u ftp_proxy -u all_proxy -u no_proxy \
+      node scripts/check-lock-policy.mjs \
+    && env \
+      -u HTTP_PROXY -u HTTPS_PROXY -u FTP_PROXY -u ALL_PROXY -u NO_PROXY \
+      -u http_proxy -u https_proxy -u ftp_proxy -u all_proxy -u no_proxy \
+      node scripts/check-lock-policy.mjs --self-test
+RUN test -z "${HTTP_PROXY:-}${HTTPS_PROXY:-}${FTP_PROXY:-}${ALL_PROXY:-}${NO_PROXY:-}${http_proxy:-}${https_proxy:-}${ftp_proxy:-}${all_proxy:-}${no_proxy:-}" \
+    && npm_config_cache=/tmp/npm-cache npm ci --ignore-scripts --no-audit --no-fund \
+    && test -x node_modules/.bin/vitest \
+    && rm -rf /tmp/npm-cache
 
-COPY . .
+# Copy only the inputs required by the deterministic unit/integration tier.
+COPY --chown=node:node src/ src/
+COPY --chown=node:node tests/ tests/
+COPY --chown=node:node vitest.config.ts tsconfig.json tsconfig.web.json ./
 
-CMD ["npm", "test"]
+ARG SKILLS_UI_CONTEXT_CANARY
+RUN --network=none test -n "$SKILLS_UI_CONTEXT_CANARY" \
+    && ! grep -R -F "$SKILLS_UI_CONTEXT_CANARY" /app >/dev/null 2>&1
+
+CMD ["/app/node_modules/.bin/vitest", "run"]

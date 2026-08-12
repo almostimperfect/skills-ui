@@ -25,6 +25,9 @@ playwright-report/
 test-results/
 e2e/output/
 
+# Ephemeral Docker build-context exclusion probes
+/src/.skills-ui-context-canary-*
+
 # Local scratch space
 temp/
 

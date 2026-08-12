@@ -1,14 +1,83 @@
-FROM mcr.microsoft.com/playwright:v1.49.1-jammy
+FROM node:20.20.2-slim@sha256:2cf067cfed83d5ea958367df9f966191a942351a2df77d6f0193e162b5febfc0 AS build
+
+RUN test "$(node --version)" = "v20.20.2" \
+    && test "$(npm --version)" = "10.8.2" \
+    && test "$(id -u node)" -ne 0 \
+    && install -d -o node -g node /app
 
 WORKDIR /app
+USER node
 
-COPY package.json package-lock.json ./
-RUN npm ci
+# Validate the immutable dependency graph before the only networked project
+# step. No application source or local development material is present here.
+COPY --chown=node:node package.json package-lock.json .npmrc ./
+COPY --chown=node:node security/npm-policy.json security/
+COPY --chown=node:node scripts/check-lock-policy.mjs scripts/
+RUN --network=none env \
+      -u HTTP_PROXY -u HTTPS_PROXY -u FTP_PROXY -u ALL_PROXY -u NO_PROXY \
+      -u http_proxy -u https_proxy -u ftp_proxy -u all_proxy -u no_proxy \
+      node scripts/check-lock-policy.mjs \
+    && env \
+      -u HTTP_PROXY -u HTTPS_PROXY -u FTP_PROXY -u ALL_PROXY -u NO_PROXY \
+      -u http_proxy -u https_proxy -u ftp_proxy -u all_proxy -u no_proxy \
+      node scripts/check-lock-policy.mjs --self-test
+RUN test -z "${HTTP_PROXY:-}${HTTPS_PROXY:-}${FTP_PROXY:-}${ALL_PROXY:-}${NO_PROXY:-}${http_proxy:-}${https_proxy:-}${ftp_proxy:-}${all_proxy:-}${no_proxy:-}" \
+    && npm_config_cache=/tmp/npm-cache npm ci --ignore-scripts --no-audit --no-fund \
+    && test -x node_modules/.bin/vitest \
+    && rm -rf /tmp/npm-cache
+RUN --network=none test -x node_modules/.bin/playwright \
+    && test -x node_modules/.bin/skills \
+    && test -x node_modules/.bin/tsc \
+    && test -x node_modules/.bin/vite
 
-COPY . .
-RUN npm run build
+# Application source becomes visible only after dependency installation. The
+# build is denied network access so dependency tooling cannot exfiltrate it.
+COPY --chown=node:node src/ src/
+COPY --chown=node:node tsconfig.json tsconfig.web.json vite.config.ts ./
+COPY --chown=node:node tailwind.config.js postcss.config.js ./
+
+ARG SKILLS_UI_CONTEXT_CANARY
+RUN --network=none test -n "$SKILLS_UI_CONTEXT_CANARY" \
+    && ! grep -R -F "$SKILLS_UI_CONTEXT_CANARY" /app >/dev/null 2>&1 \
+    && env \
+      -u HTTP_PROXY -u HTTPS_PROXY -u FTP_PROXY -u ALL_PROXY -u NO_PROXY \
+      -u http_proxy -u https_proxy -u ftp_proxy -u all_proxy -u no_proxy \
+      npm run build
+
+# Node 22.21+ can route its built-in fetch implementation through the explicit
+# environment proxy used by the authorized network tier. Copy only the reviewed
+# runtime binary into the Playwright image; npm from this stage is never used.
+FROM node:22.23.1-bookworm-slim@sha256:6c74791e557ce11fc957704f6d4fe134a7bc8d6f5ca4403205b2966bd488f6b3 AS runtime-node
+
+RUN test "$(node --version)" = "v22.23.1"
+
+# The explicit network tier receives only built application output, locked
+# dependencies, tests, and the tracked proxy. Source and build configuration
+# remain in the earlier, network-denied stage.
+FROM mcr.microsoft.com/playwright:v1.49.1-jammy@sha256:019b822658965bf5f6d509472802797554360f2940e677b2afb0f17748d0d0e3
+
+COPY --from=runtime-node /usr/local/bin/node /usr/local/bin/node
+
+RUN test "$(node --version)" = "v22.23.1" \
+    && ! ldd /usr/local/bin/node | grep -F 'not found' \
+    && command -v git >/dev/null \
+    && test "$(id -u pwuser)" -ne 0 \
+    && install -d -o pwuser -g pwuser /app
+
+WORKDIR /app
+USER pwuser
+
+COPY --from=build --chown=pwuser:pwuser /app/node_modules/ node_modules/
+COPY --from=build --chown=pwuser:pwuser /app/dist/ dist/
+COPY --from=build --chown=pwuser:pwuser /app/package.json ./
+RUN test -x node_modules/.bin/playwright \
+    && test -x node_modules/.bin/skills
+
+COPY --chown=pwuser:pwuser e2e/playwright.config.ts e2e/
+COPY --chown=pwuser:pwuser e2e/specs/ e2e/specs/
+COPY --chown=pwuser:pwuser e2e/scripts/network-proxy.mjs e2e/scripts/
 
 ENV CI=1
 ENV HOME=/tmp/skills-ui-development-e2e/home
 
-CMD ["npx", "playwright", "test", "--config", "e2e/playwright.config.ts"]
+CMD ["/app/node_modules/.bin/playwright", "test", "--config", "e2e/playwright.config.ts"]

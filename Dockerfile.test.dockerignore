@@ -1,9 +1,6 @@
-# Defense-in-depth default for callers that do not select a Dockerfile-specific
-# ignore file. Each project Dockerfile has a narrower allowlist alongside it.
 **
 
 !Dockerfile.test
-!Dockerfile.e2e
 !.npmrc
 !package.json
 !package-lock.json
@@ -15,26 +12,13 @@
 
 !src/
 !src/**
-
 !tests/
 !tests/**
+
 !vitest.config.ts
-
-!e2e/
-!e2e/playwright.config.ts
-!e2e/specs/
-!e2e/specs/**
-!e2e/scripts/
-!e2e/scripts/network-proxy.mjs
-
 !tsconfig.json
 !tsconfig.web.json
-!vite.config.ts
-!tailwind.config.js
-!postcss.config.js
 
-# Directory allowlists above must never re-include local or secret-bearing
-# artifacts nested under an approved source/test tree.
 **/.env
 **/.env.*
 **/.git
@@ -71,10 +55,6 @@
 **/dist/**
 **/coverage
 **/coverage/**
-**/playwright-report
-**/playwright-report/**
-**/test-results
-**/test-results/**
 **/tmp
 **/tmp/**
 **/temp
@@ -96,7 +76,6 @@
 **/.DS_Store
 **/.skills-ui-context-canary-*
 
-# These three reviewed root manifests are intentional build inputs.
 !.npmrc
 !package.json
 !package-lock.json

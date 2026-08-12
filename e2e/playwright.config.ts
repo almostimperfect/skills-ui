@@ -1,13 +1,17 @@
 import { defineConfig, devices } from '@playwright/test'
 
+const networkAcceptance = process.env.E2E_NETWORK === '1'
+
 export default defineConfig({
   testDir: './specs',
+  outputDir: '/tmp/skills-ui-playwright-output',
   timeout: 30_000,
   expect: { timeout: 10_000 },
   fullyParallel: false,
   workers: 1,
   retries: 0,
-  grepInvert: process.env.E2E_NETWORK === '1' ? undefined : /@network/,
+  grep: networkAcceptance ? /@network/ : undefined,
+  grepInvert: networkAcceptance ? undefined : /@network/,
   reporter: [['list']],
   use: {
     baseURL: 'http://127.0.0.1:3456',

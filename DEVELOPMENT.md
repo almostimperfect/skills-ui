@@ -1,28 +1,51 @@
 # Development
 
-Status snapshot: 2026-08-09
+Status snapshot: 2026-08-12
 
 ## Requirements
 
-- Node.js 18+
-- Docker for the containerized unit and browser test tiers
+- Docker for the preferred unit, browser, and real-source validation flow
+- Node.js 20+ for running the application or development tools directly on the
+  host, and npm 10.8.2 for reproducible host dependency operations
+
+The package metadata accepts Node.js 20 and later. Node.js 20 is end-of-life,
+so new host environments should use a currently supported LTS line. The Docker
+images remain version- and digest-pinned for reproducibility; those pins are not
+a recommendation to choose an end-of-life runtime for new host installations.
 
 ## Setup
+
+Routine validation is Docker-first and needs no host Node.js installation:
 
 ```bash
 git clone https://github.com/your-org/skills-ui
 cd skills-ui
-npm install
+sh scripts/run-docker-tests.sh
+sh e2e/scripts/run-e2e.sh
 ```
+
+For interactive host development, make the dependency acquisition explicit:
+
+```bash
+npm ci
+npm run build
+```
+
+`npm ci` follows the committed lockfile, and the project `.npmrc` disables
+lifecycle scripts during acquisition. Subsequent build, development, and test
+commands still load dependency code on that host, so the Docker tiers remain the
+safer default for repository validation.
 
 ## Commands
 
 ```bash
 npm test             # run all tests
 npm run build        # compile server TS + bundle web
+npm run check:lock-policy # validate manifest, npm config, lock, and IOC policy
+npm run test:lock-policy  # run the lock-policy negative self-tests
 npm run test:docker  # clean install + unit/integration tests in Docker
 npm run test:e2e     # deterministic Playwright suite, runtime network disabled
-npm run test:e2e:network # explicit real-source smoke tests in Docker
+npm run test:e2e:network # owner-authorized real-source smoke tests in Docker
 
 npm run dev:server   # backend on http://localhost:3456
 npm run dev:web      # Vite dev server on http://localhost:5173
@@ -32,9 +55,50 @@ npm run dev:web      # Vite dev server on http://localhost:5173
 
 | Layer | Technology |
 |---|---|
-| Backend | Node.js 18, TypeScript (ESM), Express 4 |
+| Backend | Node.js 20+, TypeScript (ESM), Express 4 |
 | Frontend | React 19, Vite 6, Tailwind CSS 3, TanStack Query 5, React Router 7 |
 | Testing | Vitest 2 + Supertest |
+
+## Dependency and test containment
+
+The container path separates dependency acquisition from repository source:
+
+- Direct dependency versions and the package manager are exact-pinned. The
+  lock-policy gate checks the manifest/lock root, lockfile version, canonical
+  npm registry tarball URLs, SHA-512 integrity metadata, reviewed lifecycle
+  declarations, and exact-version matches against the recorded malicious-package
+  snapshot.
+- Dependency acquisition uses digest-pinned `node:20.20.2-slim` with npm 10.8.2.
+  `npm ci --ignore-scripts --no-audit --no-fund` is the only project
+  build step that needs npm registry access, and it runs before application
+  source is copied into the image.
+- Once source is copied, compilation runs with build networking disabled. The
+  deterministic unit and browser containers also run with runtime networking
+  disabled.
+- The browser runtime uses digest-pinned
+  `mcr.microsoft.com/playwright:v1.49.1-jammy` and a Node.js 22.23.1 binary
+  copied from digest-pinned `node:22.23.1-bookworm-slim`. The latter supplies
+  native environment-proxy support for the explicit network tier.
+- Test containers have no host bind mounts, volumes, home directories,
+  credentials, browser profiles, Git/SSH agents, or Docker socket. They run as
+  non-root with a read-only image, all capabilities dropped, `no-new-privileges`,
+  resource limits, and `nosuid,nodev,noexec` temporary filesystems.
+
+The malicious-package list is a dated, offline exact-version snapshot, not a
+live reputation service and not proof that unlisted packages are safe. Lockfile
+and integrity checks detect drift and known exact indicators; they do not prove
+publisher intent, source provenance, or future ecosystem safety. Image pulls,
+the dependency-install build step, Docker daemon storage/cache, and the Docker
+VM/kernel boundary also remain outside the runtime `--network=none` guarantee.
+
+The real-source tier is a separate, owner-authorized acceptance test. Its test
+container can reach only an internal Docker network and a dual-homed CONNECT
+proxy. That proxy admits the exact recorded GitHub hostnames, not particular
+repositories or URL paths; non-allowlisted hosts, the npm registry, and known
+telemetry endpoints are denied at runtime. Docker DNS, the internal-network
+gateway, proxy implementation, Docker VM, and container-runtime boundary remain
+residual attack surfaces. Full details are in
+[Real Network Source Smoke Test v1.2](./docs/testing/network-source-smoke-test-v1.2.md).
 
 ## R&D Direction
 
@@ -212,6 +276,7 @@ Implemented:
 - modified-copy recovery and catalog-only Skill deletion
 - English and Chinese interfaces with a persistent language switcher
 - deterministic Docker browser tests plus an opt-in real-network tier
+- exact dependency pins, a lock/IOC policy gate, and hardened Docker runners
 
 Validation commands:
 
@@ -219,9 +284,9 @@ Validation commands:
 - `npm test`
 - `npm run test:docker`
 - `npm run test:e2e`
-- `npm run test:e2e:network` (explicit opt-in; depends on external repositories)
+- `npm run test:e2e:network` (explicit owner authorization; fixed external sources)
 
-The deterministic Docker E2E tier runs without runtime network access and without host bind mounts. See [docs/testing/network-source-smoke-test-v1.1.md](./docs/testing/network-source-smoke-test-v1.1.md) for the separate real-network boundary.
+The deterministic Docker E2E tier runs without runtime network access and without host bind mounts. See [docs/testing/network-source-smoke-test-v1.2.md](./docs/testing/network-source-smoke-test-v1.2.md) for the separate real-network boundary.
 
 ## File Map
 

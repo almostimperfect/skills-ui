@@ -1,5 +1,4 @@
 import { createHash } from 'crypto'
-import { execFileSync } from 'child_process'
 import { readFile, readdir } from 'fs/promises'
 import { join, relative } from 'path'
 import { readGlobalSkillLock, readLocalSkillLock } from './skills-lock.js'
@@ -10,6 +9,8 @@ import type {
   SkillMaintenanceInfo,
   SkillUpdateInfo,
 } from './types.js'
+
+const GITHUB_FETCH_TIMEOUT_MS = 10_000
 
 function nowIso(): string {
   return new Date().toISOString()
@@ -23,50 +24,42 @@ function getSkipReason(entry: Awaited<ReturnType<typeof readGlobalSkillLock>>['s
   return 'No version tracking'
 }
 
-function getGitHubToken(): string | null {
-  const envToken = process.env.GITHUB_TOKEN?.trim() || process.env.GH_TOKEN?.trim()
-  if (envToken) return envToken
-  try {
-    const token = execFileSync('gh', ['auth', 'token'], {
-      encoding: 'utf-8',
-      stdio: ['ignore', 'pipe', 'ignore'],
-    }).trim()
-    return token || null
-  } catch {
-    return null
-  }
-}
-
-async function fetchGitHubSkillFolderHash(ownerRepo: string, skillPath: string, token: string | null): Promise<string | null> {
+async function fetchGitHubSkillFolderHash(ownerRepo: string, skillPath: string): Promise<string | null> {
   let folderPath = skillPath.replace(/\\/g, '/')
   if (folderPath.endsWith('/SKILL.md')) folderPath = folderPath.slice(0, -9)
   else if (folderPath.endsWith('SKILL.md')) folderPath = folderPath.slice(0, -8)
   if (folderPath.endsWith('/')) folderPath = folderPath.slice(0, -1)
 
-  for (const branch of ['main', 'master']) {
-    try {
-      const headers: Record<string, string> = {
-        Accept: 'application/vnd.github.v3+json',
-        'User-Agent': 'skills-ui',
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), GITHUB_FETCH_TIMEOUT_MS)
+
+  try {
+    for (const branch of ['main', 'master']) {
+      try {
+        const response = await fetch(`https://api.github.com/repos/${ownerRepo}/git/trees/${branch}?recursive=1`, {
+          credentials: 'omit',
+          headers: {
+            Accept: 'application/vnd.github.v3+json',
+            'User-Agent': 'skills-ui',
+          },
+          signal: controller.signal,
+        })
+        if (!response.ok) continue
+
+        const data = await response.json() as {
+          sha?: string
+          tree?: Array<{ type?: string; path?: string; sha?: string }>
+        }
+        if (!folderPath) return data.sha ?? null
+
+        const folderEntry = data.tree?.find(entry => entry.type === 'tree' && entry.path === folderPath)
+        if (folderEntry?.sha) return folderEntry.sha
+      } catch {
+        if (controller.signal.aborted) return null
       }
-      if (token) headers.Authorization = `Bearer ${token}`
-
-      const response = await fetch(`https://api.github.com/repos/${ownerRepo}/git/trees/${branch}?recursive=1`, {
-        headers,
-      })
-      if (!response.ok) continue
-
-      const data = await response.json() as {
-        sha?: string
-        tree?: Array<{ type?: string; path?: string; sha?: string }>
-      }
-      if (!folderPath) return data.sha ?? null
-
-      const folderEntry = data.tree?.find(entry => entry.type === 'tree' && entry.path === folderPath)
-      if (folderEntry?.sha) return folderEntry.sha
-    } catch {
-      continue
     }
+  } finally {
+    clearTimeout(timeout)
   }
 
   return null
@@ -139,7 +132,7 @@ async function getUpdateInfo(skill: InventorySkill): Promise<SkillUpdateInfo> {
     }
   }
 
-  const latestHash = await fetchGitHubSkillFolderHash(entry.source, entry.skillPath, getGitHubToken())
+  const latestHash = await fetchGitHubSkillFolderHash(entry.source, entry.skillPath)
   if (!latestHash) {
     return {
       supported: true,

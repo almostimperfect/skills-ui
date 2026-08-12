@@ -111,6 +111,32 @@ gateway, proxy implementation, Docker VM, and container-runtime boundary remain
 residual attack surfaces. Full details are in
 [Real Network Source Smoke Test v1.2](./docs/testing/network-source-smoke-test-v1.2.md).
 
+### Native subprocess and credential boundary
+
+Supported GitHub-backed Skills are checked for updates automatically. The check
+uses a time-bounded anonymous GitHub API request: it does not read `GH_TOKEN` or
+`GITHUB_TOKEN`, invoke `gh`, or attach an authorization header. Anonymous API
+availability and rate limits therefore remain part of the maintenance result.
+
+The bundled `skills` CLI does not receive a copy of the application's ambient
+environment. Its subprocess environment is selected by operation. List and
+removal work do not receive proxy configuration. An explicit operation routed
+through `skills add` may receive only the project-specific
+`SKILLS_UI_HTTPS_PROXY` value; generic ambient proxy variables are not reused.
+That one value is normalized for Node and command-scoped Git access. Git is
+non-interactive, ignores user and system credential helpers and hooks, and
+permits only HTTPS. Ambient GitHub, npm, cloud, SSH-agent, Docker, other proxy,
+and unrelated variables are not forwarded.
+
+Environment filtering limits accidental credential inheritance; it does not
+confine the native process. Direct host use still gives the CLI and any loaded
+dependency the user's filesystem authority and the real home directory, so
+malicious code could probe known paths for user data without learning those
+paths from environment variables. It may also retain whatever direct network
+access the host grants the process. The Docker test tiers remain the development
+and validation boundary: they use disposable homes, omit host mounts and
+credentials, and restrict runtime networking as described above.
+
 ## R&D Direction
 
 Product-facing design notes live in [docs/PRODUCT_DESIGN.md](./docs/PRODUCT_DESIGN.md). Work prioritization and private development-control records stay outside the tracked public tree, normally under the ignored `.development/` directory.

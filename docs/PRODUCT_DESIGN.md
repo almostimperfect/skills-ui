@@ -1,6 +1,6 @@
 # Product Design
 
-Status snapshot: 2026-08-09
+Status snapshot: 2026-08-12
 
 ## Product Goal
 
@@ -92,6 +92,14 @@ Operation rules:
 - CLI-managed remote assets copied to another project should be installed from the original remote source through `skills add --skill`
 - uninstall for local/archive/manual instances should remove the concrete target directories represented in the asset model
 - uninstall for CLI-managed remote instances should use `skills remove` so the upstream lock remains coherent
+
+Credential and network rules:
+
+- automatic maintenance may query GitHub anonymously, but it must not consume `GH_TOKEN` or `GITHUB_TOKEN`, invoke `gh`, or attach ambient credentials
+- bundled `skills` operations should receive a minimal, operation-specific environment rather than all variables inherited by `skills-ui`
+- only an explicit operation routed through `skills add` should receive the project-specific `SKILLS_UI_HTTPS_PROXY` setting needed for its intended network operation; generic ambient proxy variables remain excluded
+- filtering subprocess variables is defense in depth, not sandboxing: native host execution still gives the CLI the user's filesystem authority, a real home directory, and any direct network access allowed by the host
+- development and acceptance testing should continue to use the isolated Docker tiers with synthetic data and disposable homes
 
 External changes are allowed:
 

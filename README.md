@@ -53,6 +53,20 @@ browser-origin boundary, not native-client authentication: another process on
 the same host that can reach loopback can reproduce the bootstrap request and
 establish its own session. Operating-system isolation is a separate boundary.
 
+Maintenance checks automatically make time-bounded, anonymous requests to the
+GitHub API for supported GitHub-backed Skills. They do not read `GH_TOKEN` or
+`GITHUB_TOKEN`, and do not invoke `gh`. Bundled `skills` CLI subprocesses receive
+an operation-specific environment instead of the application's full ambient
+environment; an explicit operation routed through `skills add` can receive the
+project-specific `SKILLS_UI_HTTPS_PROXY` setting when a proxy is needed.
+
+These controls reduce incidental credential exposure, but they are not a
+sandbox. When `skills-ui` runs directly on the host, the bundled CLI and its
+dependencies still run as the user and use the real home directory; malicious
+code could therefore try to read user data by known filesystem paths even when
+secret environment variables are absent. Use the Docker-first validation tiers
+below for development and test execution.
+
 ### CLI
 
 ```bash

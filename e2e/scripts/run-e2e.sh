@@ -383,6 +383,7 @@ docker run --rm \
   --env PATH="$SAFE_PATH" \
   --env HTTP_PROXY="$PROXY_URL" \
   --env HTTPS_PROXY="$PROXY_URL" \
+  --env SKILLS_UI_HTTPS_PROXY="$PROXY_URL" \
   --env ALL_PROXY="$PROXY_URL" \
   --env http_proxy="$PROXY_URL" \
   --env https_proxy="$PROXY_URL" \
